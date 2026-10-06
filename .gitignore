@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+.next/
+out/
+
+# AI
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.onnx
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+EOF
