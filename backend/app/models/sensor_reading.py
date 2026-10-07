@@ -1,14 +1,14 @@
 from datetime import datetime
-
 from sqlalchemy import (
     Column,
     BigInteger,
     Integer,
     Numeric,
     DateTime,
-    ForeignKey,text
+    ForeignKey,
+    text
 )
-
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -17,20 +17,23 @@ class SensorReading(Base):
 
     id = Column(
         BigInteger,
-        primary_key=True
+        primary_key=True,
+        index=True
     )
 
     tank_id = Column(
         Integer,
-        ForeignKey("tanks.id"),
-        nullable=False
+        ForeignKey("tanks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
 
     recorded_at = Column(
-    DateTime,
-    server_default=text("CURRENT_TIMESTAMP"),
-    nullable=False
-)
+        DateTime,
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
+        index=True
+    )
 
     temperature = Column(
         Numeric(6, 2)
@@ -63,3 +66,5 @@ class SensorReading(Base):
     ai_risk_probability = Column(
         Numeric(5, 4)
     )
+
+    tank = relationship("Tank", back_populates="sensor_readings")

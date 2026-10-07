@@ -1,7 +1,11 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "postgresql://aquaguard:aquaguard@localhost:5433/aquaguard"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://aquaguard:aquaguard@localhost:5432/aquaguard"
+)
 
 engine = create_engine(
     DATABASE_URL,
