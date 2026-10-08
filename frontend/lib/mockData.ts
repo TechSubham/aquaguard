@@ -441,6 +441,17 @@ export const INITIAL_AI_PREDICTION: AIPredictionData = {
   tankId: 'A2-ROOF-01',
   currentRiskPercent: 84,
   riskLevel: 'HIGH',
+  historyWindowHours: 24,
+  historyPointsCount: 25,
+  history24hSummary: {
+    span_hours: 24,
+    sample_count: 288,
+    turbidity: { current: 6.88, at_24h_ago: 0.88, net_drift_24h: 6.0, mean_24h: 2.2, max_24h: 6.88, min_24h: 0.88 },
+    tds: { current: 486.0, at_24h_ago: 272.0, net_drift_24h: 214.0, mean_24h: 338.7, max_24h: 486.0 },
+    ph: { current: 6.39, at_24h_ago: 7.28, net_drift_24h: -0.89, min_24h: 6.39, max_24h: 7.28 },
+    water_level: { current: 79.9, min_24h: 79.9, max_24h: 86.0, net_drop_24h: 6.1 },
+    cumulative_turbidity_load: 188.9,
+  },
   futureProjections: [
     { timeOffset: 'Now', riskPercent: 84 },
     { timeOffset: '+2 hrs', riskPercent: 87 },

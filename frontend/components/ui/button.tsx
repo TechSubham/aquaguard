@@ -27,13 +27,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       icon: "h-9 w-9 p-0",
     };
 
-    return (
-      <button
-        ref={ref}
-        className={cn(baseStyles, variants[variant], sizes[size], className)}
-        {...props}
-      />
-    );
+    return ( < button ref={ref} className={cn(baseStyles, variants[variant], sizes[size], className)} {...props} /> );
   }
 );
 Button.displayName = "Button";

@@ -7,13 +7,15 @@ import {
   Incident,
   IncidentStage,
   UserSession,
-  Hostel
+  Hostel,
+  AIPredictionData
 } from './types';
 import {
   INITIAL_READING_A2,
   INITIAL_TANKS,
   INITIAL_HOSTELS,
   INITIAL_ALERTS,
+  INITIAL_AI_PREDICTION,
   INITIAL_COMPLAINTS,
   INITIAL_WATER_TESTS,
   INITIAL_INCIDENT,
@@ -419,3 +421,102 @@ export async function loginUserApi(email: string, password: string): Promise<any
   }
   return null;
 }
+
+// ----------------------------------------------------
+// 9. AI Prediction & Intelligence API
+// ----------------------------------------------------
+function mapBackendAIPrediction(data: any): AIPredictionData {
+  const trajectory = data.trajectory || {};
+  return {
+    tankId: data.tank_id || 'A2-ROOF-01',
+    currentRiskPercent: Number(trajectory.current ?? data.risk_score ?? 84),
+    riskLevel: data.severity || (data.risk_score > 70 ? 'HIGH' : data.risk_score > 40 ? 'MODERATE' : 'LOW'),
+    riskProbability: Number(data.risk_probability ?? 0.84),
+    predictionHorizonHours: Number(data.prediction_horizon_hours ?? 6),
+    historyWindowHours: Number(data.history_window_hours ?? 24),
+    historyPointsCount: Number(data.history_points_count ?? 25),
+    history24hSummary: data.history_24h_summary,
+    history24hSnapshots: data.history_24h_snapshots,
+    futureProjections: [
+      { timeOffset: 'Now', riskPercent: Number(trajectory.current ?? data.risk_score ?? 84) },
+      { timeOffset: '+2 hrs', riskPercent: Number(trajectory.plus_2h ?? Math.min(100, (data.risk_score || 84) + 3)) },
+      { timeOffset: '+4 hrs', riskPercent: Number(trajectory.plus_4h ?? Math.min(100, (data.risk_score || 84) + 7)) },
+      { timeOffset: '+6 hrs', riskPercent: Number(trajectory.plus_6h ?? Math.min(100, (data.risk_score || 84) + 10)) },
+    ],
+    predictionSummary: data.prediction_summary || 'Water-quality deterioration likely within 4–6 hours.',
+    rootCauses: (data.contributing_factors || []).map((f: any) => ({
+      factor: f.factor || 'Turbidity acceleration',
+      trend: f.trend || 'up',
+      detail: f.detail || '',
+      contribution: f.contribution || 0.5,
+    })),
+    possibleCauses: (data.possible_causes || []).map((c: any) => ({
+      cause: c.cause || 'Filter membrane degradation',
+      confidencePercent: Number(c.confidencePercent ?? Math.round((c.confidence || 0.74) * 100)),
+      notes: c.notes || '',
+    })),
+    recommendedActions: data.recommended_actions || [
+      '1. Inspect filtration system',
+      '2. Inspect tank condition',
+      '3. Collect laboratory water sample'
+    ],
+    lastInferenceAt: data.last_inferred_at || 'Just now (Model v2.0-XGBoost)',
+    modelVersion: data.model_version || 'v2.0-XGBoost-Ensemble',
+    anomalyDetected: Boolean(data.anomaly_detected),
+    anomalyDetails: data.anomaly_details,
+    abnormalPatternDetected: Boolean(data.abnormal_pattern_detected),
+    maintenancePrediction: data.maintenance_prediction,
+    leakagePrediction: data.leakage_prediction,
+    complaintCorrelation: data.complaint_correlation,
+    safetyStatement: data.safety_statement,
+  };
+}
+
+export async function fetchAIPrediction(tankCode: string): Promise<AIPredictionData> {
+  try {
+    const res = await fetch(`${API_BASE}/ai/predict-risk/${tankCode}`, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return mapBackendAIPrediction(data);
+    }
+  } catch (e) {
+    console.warn('Backend AI fetch failed, using resilient local fallback:', e);
+  }
+  return INITIAL_AI_PREDICTION;
+}
+
+export async function triggerAIInference(tankCode: string, payload?: any): Promise<AIPredictionData> {
+  try {
+    const res = await fetch(`${API_BASE}/ai/predict-risk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload || { tank_id: tankCode }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return mapBackendAIPrediction(data);
+    }
+  } catch (e) {
+    console.warn('Backend AI inference trigger failed:', e);
+  }
+  return fetchAIPrediction(tankCode);
+}
+
+export async function fetchFleetAIPredictions(): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE}/ai/fleet-predictions`, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.warn('Backend Fleet AI fetch failed:', e);
+  }
+  return null;
+}
+

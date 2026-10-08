@@ -129,11 +129,10 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                 setSelectedMetric(key);
                 setHoveredPoint(null);
               }}
-              className={`px-3 py-1 text-xs font-mono rounded-md transition-all whitespace-nowrap ${
-                selectedMetric === key
+              className={`px-3 py-1 text-xs font-mono rounded-md transition-all whitespace-nowrap ${selectedMetric === key
                   ? 'bg-white text-black font-bold shadow-sm'
                   : 'text-zinc-400 hover:text-white'
-              }`}
+                }`}
             >
               {METRICS[key].label.split(' ')[0]}
             </button>
@@ -316,15 +315,7 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
 
             {/* Time labels across X Axis */}
             {points.filter((_, idx) => idx % 6 === 0 || idx === points.length - 1).map((pt, i) => (
-              <text
-                key={i}
-                x={pt.x}
-                y={padTop + plotHeight + 20}
-                textAnchor="middle"
-                fill="#71717a"
-                fontSize="9"
-                fontFamily="monospace"
-              >
+              <text key={i} x={pt.x} y={padTop + plotHeight + 20} textAnchor="middle" fill="#71717a" fontSize="9" fontFamily="monospace">
                 {new Date(pt.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </text>
             ))}

@@ -85,6 +85,52 @@ export interface AIPredictionData {
   tankId: string;
   currentRiskPercent: number;
   riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+  riskProbability?: number;
+  predictionHorizonHours?: number;
+  historyWindowHours?: number;
+  historyPointsCount?: number;
+  history24hSummary?: {
+    span_hours?: number;
+    sample_count?: number;
+    turbidity?: {
+      current: number;
+      at_24h_ago: number;
+      net_drift_24h: number;
+      mean_24h: number;
+      max_24h: number;
+      min_24h: number;
+    };
+    tds?: {
+      current: number;
+      at_24h_ago: number;
+      net_drift_24h: number;
+      mean_24h: number;
+      max_24h: number;
+    };
+    ph?: {
+      current: number;
+      at_24h_ago: number;
+      net_drift_24h: number;
+      min_24h: number;
+      max_24h: number;
+    };
+    water_level?: {
+      current: number;
+      min_24h: number;
+      max_24h: number;
+      net_drop_24h: number;
+    };
+    cumulative_turbidity_load?: number;
+  };
+  history24hSnapshots?: {
+    hour_offset: number;
+    recorded_at: string;
+    turbidity: number;
+    tds: number;
+    ph: number;
+    water_level: number;
+    flow_rate: number;
+  }[];
   futureProjections: {
     timeOffset: string;
     riskPercent: number;
@@ -94,6 +140,7 @@ export interface AIPredictionData {
     factor: string;
     trend: 'up' | 'down' | 'stable';
     detail: string;
+    contribution?: number;
   }[];
   possibleCauses: {
     cause: string;
@@ -103,6 +150,32 @@ export interface AIPredictionData {
   recommendedActions: string[];
   lastInferenceAt: string;
   modelVersion: string;
+  anomalyDetected?: boolean;
+  anomalyDetails?: {
+    is_sensor_glitch?: boolean;
+    message?: string;
+    anomaly_probability?: number;
+    anomaly_type?: string;
+  };
+  abnormalPatternDetected?: boolean;
+  maintenancePrediction?: {
+    maintenance_risk_percent?: number;
+    maintenance_window?: string;
+    recommendation?: string;
+    days_since_last_service?: number;
+  };
+  leakagePrediction?: {
+    detected?: boolean;
+    confidence_percent?: number;
+    recommendation?: string;
+    estimated_hourly_drop_percent?: number;
+  };
+  complaintCorrelation?: {
+    correlated?: boolean;
+    complaint_count?: number;
+    summary?: string;
+  };
+  safetyStatement?: string;
 }
 
 export interface Complaint {

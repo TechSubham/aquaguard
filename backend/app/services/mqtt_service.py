@@ -164,7 +164,45 @@ def on_message(client, userdata, msg):
             print(f"ERROR: Tank '{tank_code}' not found in PostgreSQL")
             return
 
-        # 4. Create and save sensor reading
+        # 4. Fetch recent history for AI temporal feature extraction
+        past_readings = (
+            db.query(SensorReading)
+            .filter(SensorReading.tank_id == tank.id)
+            .order_by(SensorReading.recorded_at.desc().nullslast(), SensorReading.id.desc())
+            .limit(25)
+            .all()
+        )
+        history = [
+            {
+                "ph": float(r.ph or 7.2),
+                "tds": float(r.tds or 280.0),
+                "turbidity": float(r.turbidity or 1.0),
+                "temperature": float(r.temperature or 25.0),
+                "water_level": float(r.water_level or 80.0),
+                "flow_rate": float(r.flow_rate or 3.5),
+                "recorded_at": r.recorded_at.isoformat() if r.recorded_at else None
+            }
+            for r in reversed(past_readings)
+        ]
+
+        # Run AI Predictive Intelligence Layer
+        try:
+            from app.services.ai_engine import ai_engine
+            from app.routes.ai import _sync_predictive_alerts
+            ai_pred = ai_engine.predict_risk(
+                tank_code=tank.tank_code,
+                current_reading=payload,
+                history=history
+            )
+            calculated_risk_score = ai_pred["risk_score"]
+            calculated_ai_prob = ai_pred["risk_probability"]
+        except Exception as e:
+            print(f"[MQTT AI WARNING] Fallback on AI prediction: {e}")
+            calculated_risk_score = payload.get("risk_score") or 20
+            calculated_ai_prob = 0.20
+            ai_pred = None
+
+        # 5. Create and save sensor reading
         reading = SensorReading(
             tank_id=tank.id,
             temperature=payload.get("temperature"),
@@ -173,15 +211,18 @@ def on_message(client, userdata, msg):
             turbidity=payload.get("turbidity"),
             water_level=payload.get("water_level"),
             flow_rate=payload.get("flow_rate"),
-            risk_score=payload.get("risk_score"),
+            risk_score=calculated_risk_score,
+            ai_risk_probability=calculated_ai_prob
         )
         db.add(reading)
         db.commit()
         db.refresh(reading)
-        print(f"Reading saved to PostgreSQL (reading ID: {reading.id})")
+        print(f"Reading saved to PostgreSQL (reading ID: {reading.id}, AI Risk: {calculated_risk_score}%)")
 
-        # 5. Check thresholds and manage alerts with deduplication
+        # 6. Check physical thresholds & AI predictive alerts
         check_and_manage_threshold_alerts(db, tank, reading)
+        if ai_pred:
+            _sync_predictive_alerts(db, tank, ai_pred)
 
     except json.JSONDecodeError as e:
         print(f"Invalid JSON received from MQTT: {e}")

@@ -38,7 +38,9 @@ import {
   createWaterTestApi,
   fetchIncidentsApi,
   updateIncidentStageApi,
-  updateAlertStatusApi
+  updateAlertStatusApi,
+  fetchAIPrediction,
+  triggerAIInference
 } from './api';
 
 interface AquaGuardContextType {
@@ -65,6 +67,7 @@ interface AquaGuardContextType {
   setIsLiveUpdating: (val: boolean) => void;
   lastRefreshTime: Date;
   refreshData: () => Promise<void>;
+  runAIInference: () => Promise<AIPredictionData>;
   resolveAlert: (id: string) => void;
   investigateAlert: (id: string) => void;
   addComplaint: (complaint: Omit<Complaint, 'id' | 'submittedAt' | 'status'>) => void;
@@ -175,33 +178,35 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [isLiveUpdating, refreshData]);
 
-  // When selectedTankId changes, update AI prediction and reading
-  useEffect(() => {
-    if (selectedTankIdState === 'A2-ROOF-01') {
-      setAiPrediction(INITIAL_AI_PREDICTION);
-    } else {
-      setAiPrediction({
-        tankId: selectedTankIdState,
-        currentRiskPercent: selectedTank.riskScore,
-        riskLevel: selectedTank.riskStatus === 'CRITICAL' ? 'HIGH' : 'LOW',
-        futureProjections: [
-          { timeOffset: 'Now', riskPercent: selectedTank.riskScore },
-          { timeOffset: '+2 hrs', riskPercent: Math.min(100, selectedTank.riskScore + 2) },
-          { timeOffset: '+4 hrs', riskPercent: Math.min(100, selectedTank.riskScore + 4) },
-          { timeOffset: '+6 hrs', riskPercent: Math.min(100, selectedTank.riskScore + 5) },
-        ],
-        predictionSummary: 'Telemetry shows nominal operating boundaries. No critical contamination risk projected.',
-        rootCauses: [
-          { factor: 'Turbidity Baseline', trend: 'stable', detail: 'Within WHO standard limit < 1.0 NTU' },
-          { factor: 'Disinfection Residual', trend: 'stable', detail: 'Active chlorination optimal' },
-        ],
-        possibleCauses: [],
-        recommendedActions: ['Continue standard automated telemetry monitoring'],
-        lastInferenceAt: 'Just now (Model v2.4-LSTM-WaterGuard)',
-        modelVersion: 'v2.4-LSTM-WaterGuard',
-      });
+  const runAIInference = useCallback(async (): Promise<AIPredictionData> => {
+    try {
+      const result = await triggerAIInference(selectedTankIdState);
+      setAiPrediction(result);
+      return result;
+    } catch (e) {
+      console.warn('Inference execution failed:', e);
+      return aiPrediction;
     }
-  }, [selectedTankIdState, selectedTank]);
+  }, [selectedTankIdState, aiPrediction]);
+
+  // When selectedTankId changes, fetch live AI prediction from FastAPI backend
+  useEffect(() => {
+    let isMounted = true;
+    async function loadTankPrediction() {
+      try {
+        const pred = await fetchAIPrediction(selectedTankIdState);
+        if (isMounted && pred) {
+          setAiPrediction(pred);
+        }
+      } catch (err) {
+        console.warn('Failed to load live AI prediction, fallback to initial:', err);
+      }
+    }
+    loadTankPrediction();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedTankIdState]);
 
   // Initial Backend Data Fetch
   useEffect(() => {
@@ -358,6 +363,7 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
         setIsLiveUpdating,
         lastRefreshTime,
         refreshData,
+        runAIInference,
         resolveAlert,
         investigateAlert,
         addComplaint,

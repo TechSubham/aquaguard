@@ -14,6 +14,7 @@ from app.routes.incidents import router as incidents_router
 from app.routes.consumption import router as consumption_router
 from app.routes.leakage import router as leakage_router
 from app.routes.notifications import router as notifications_router
+from app.routes.ai import router as ai_router
 
 app = FastAPI(
     title="AquaGuard API",
@@ -44,6 +45,7 @@ app.include_router(incidents_router)
 app.include_router(consumption_router)
 app.include_router(leakage_router)
 app.include_router(notifications_router)
+app.include_router(ai_router)
 
 
 @app.get("/")
@@ -54,6 +56,7 @@ def root():
         "status": "operational",
         "endpoints": [
             "/readings",
+            "/ai",
             "/alerts",
             "/hostels",
             "/blocks",
