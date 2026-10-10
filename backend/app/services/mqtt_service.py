@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
@@ -8,7 +9,14 @@ from app.models.tank import Tank
 from app.models.alert import Alert
 from app.models.notification import Notification
 
-MQTT_BROKER = "35.157.128.15"
+MQTT_BROKERS = [
+    broker.strip()
+    for broker in os.getenv(
+        "MQTT_BROKERS",
+        "35.157.128.15,3.121.14.149,3.122.213.173"
+    ).split(",")
+    if broker.strip()
+]
 MQTT_PORT = 1883
 
 MQTT_TOPIC = "aquaguard/A2-ROOF-01/telemetry/readings"
@@ -194,7 +202,8 @@ def check_and_manage_threshold_alerts(db, tank: Tank, reading: SensorReading):
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        print("MQTT connected successfully")
+        broker = userdata.get("broker") if isinstance(userdata, dict) else "unknown"
+        print(f"MQTT connected successfully: {broker}")
         client.subscribe(MQTT_TOPIC)
         print(f"Subscribed to: {MQTT_TOPIC}")
     else:
@@ -324,12 +333,19 @@ def on_message(client, userdata, msg):
 
 
 def start_mqtt():
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_message = on_message
-    print("Connecting to MQTT broker...")
-    client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    client.loop_start()
+    clients = []
+    for broker in MQTT_BROKERS:
+        client = mqtt.Client(userdata={"broker": broker})
+        client.on_connect = on_connect
+        client.on_message = on_message
+        print(f"Connecting to MQTT broker: {broker}")
+        try:
+            client.connect(broker, MQTT_PORT, 60)
+            client.loop_start()
+            clients.append(client)
+        except Exception as e:
+            print(f"MQTT broker connection failed for {broker}: {e}")
+    return clients
 
 
 if __name__ == "__main__":

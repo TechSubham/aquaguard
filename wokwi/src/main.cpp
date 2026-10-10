@@ -24,8 +24,13 @@ const char* WIFI_PASSWORD = "";
 // =========================
 // MQTT
 // =========================
-IPAddress MQTT_SERVER(35, 157, 128, 15);
 const int MQTT_PORT = 1883;
+IPAddress MQTT_BROKERS[] = {
+    IPAddress(35, 157, 128, 15),
+    IPAddress(3, 121, 14, 149),
+    IPAddress(3, 122, 213, 173)
+};
+const int MQTT_BROKER_COUNT = sizeof(MQTT_BROKERS) / sizeof(MQTT_BROKERS[0]);
 
 const char* MQTT_TOPIC = "aquaguard/A2-ROOF-01/telemetry/readings";
 
@@ -44,6 +49,11 @@ DallasTemperature tempSensor(&oneWire);
 float phRaw = 0.0;
 float tdsRaw = 0.0;
 float turbidityRaw = 0.0;
+int mqttBrokerIndex = 0;
+
+String formatIp(IPAddress ip) {
+    return String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
+}
 
 // =========================
 // Connect WiFi
@@ -73,11 +83,18 @@ void connectMQTT() {
 
     while (!mqttClient.connected()) {
 
-        Serial.print("Connecting to MQTT...");
+        IPAddress broker = MQTT_BROKERS[mqttBrokerIndex];
+        mqttClient.setServer(broker, MQTT_PORT);
+
+        Serial.print("Connecting to MQTT ");
+        Serial.print(formatIp(broker));
+        Serial.print("...");
 
         String clientId =
             "AquaGuard-ESP32-" +
-            String(random(0xffff), HEX);
+            String(random(0xffff), HEX) +
+            "-" +
+            String(millis(), HEX);
 
         if (mqttClient.connect(clientId.c_str())) {
 
@@ -89,6 +106,7 @@ void connectMQTT() {
             Serial.print(mqttClient.state());
             Serial.println(" retrying...");
 
+            mqttBrokerIndex = (mqttBrokerIndex + 1) % MQTT_BROKER_COUNT;
             delay(3000);
         }
     }
@@ -230,10 +248,6 @@ void setup() {
 
     randomSeed(micros());
 
-    mqttClient.setServer(
-        MQTT_SERVER,
-        MQTT_PORT
-    );
     mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
 
     connectWiFi();
