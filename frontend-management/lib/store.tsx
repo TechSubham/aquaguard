@@ -44,6 +44,8 @@ import {
   triggerAIInference
 } from './api';
 
+const LIVE_TELEMETRY_REFRESH_MS = 5000;
+
 interface AquaGuardContextType {
   role: Role;
   setRole: (role: Role) => void;
@@ -189,7 +191,7 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
 
     const interval = setInterval(() => {
       refreshData();
-    }, 60000);
+    }, LIVE_TELEMETRY_REFRESH_MS);
 
     return () => clearInterval(interval);
   }, [isLiveUpdating, refreshData]);

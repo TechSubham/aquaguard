@@ -35,6 +35,7 @@ const char* MQTT_TOPIC = "aquaguard/A2-ROOF-01/telemetry/readings";
 const char* TANK_ID = "A2-ROOF-01";
 const char* FIRMWARE_VERSION = "wokwi-live-sensors-v2";
 const unsigned long TELEMETRY_INTERVAL_MS = 5000;
+const uint16_t MQTT_BUFFER_SIZE = 768;
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -233,6 +234,7 @@ void setup() {
         MQTT_SERVER,
         MQTT_PORT
     );
+    mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
 
     connectWiFi();
 }
@@ -365,6 +367,14 @@ void loop() {
     Serial.println(risk);
     Serial.print("  mqtt_topic:       ");
     Serial.println(MQTT_TOPIC);
+    Serial.print("  mqtt_connected:   ");
+    Serial.println(mqttClient.connected() ? "YES" : "NO");
+    Serial.print("  mqtt_state:       ");
+    Serial.println(mqttClient.state());
+    Serial.print("  payload_bytes:    ");
+    Serial.println(strlen(payload));
+    Serial.print("  mqtt_buffer:      ");
+    Serial.println(MQTT_BUFFER_SIZE);
     Serial.print("  mqtt_publish:     ");
     Serial.println(published ? "SUCCESS" : "FAILED");
     Serial.print("  json:             ");

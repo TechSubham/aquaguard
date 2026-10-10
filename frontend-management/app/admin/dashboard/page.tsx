@@ -10,6 +10,7 @@ import { WaterQualityChart } from '@/components/shared/WaterQualityChart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatClockTime, timeAgo } from '@/lib/utils';
 import {
   AlertTriangle,
   BrainCircuit,
@@ -37,6 +38,10 @@ export default function AdminDashboardPage() {
     lastRefreshTime,
   } = useAquaGuard();
 
+  const latestReadingLabel = currentReading.recorded_at
+    ? timeAgo(currentReading.recorded_at)
+    : 'No live reading';
+
   const sensorMetrics: SensorMetricCardData[] = [
     {
       key: 'ph',
@@ -48,7 +53,7 @@ export default function AdminDashboardPage() {
       trend: currentReading.ph < 6.5 ? 'DOWN' : 'STABLE',
       status: currentReading.ph < 6.5 || currentReading.ph > 8.5 ? 'WARNING' : 'NORMAL',
       optimalRange: '6.5 – 8.5',
-      lastUpdated: 'Just now',
+      lastUpdated: latestReadingLabel,
     },
     {
       key: 'tds',
@@ -60,7 +65,7 @@ export default function AdminDashboardPage() {
       trend: currentReading.tds > 400 ? 'UP' : 'STABLE',
       status: currentReading.tds > 500 ? 'CRITICAL' : currentReading.tds > 300 ? 'WARNING' : 'NORMAL',
       optimalRange: '< 300 ppm (Max 500)',
-      lastUpdated: 'Just now',
+      lastUpdated: latestReadingLabel,
     },
     {
       key: 'turbidity',
@@ -72,7 +77,7 @@ export default function AdminDashboardPage() {
       trend: currentReading.turbidity > 2.0 ? 'UP' : 'STABLE',
       status: currentReading.turbidity > 5.0 ? 'CRITICAL' : currentReading.turbidity > 1.5 ? 'WARNING' : 'NORMAL',
       optimalRange: '< 1.0 NTU (Safe < 5.0)',
-      lastUpdated: 'Just now',
+      lastUpdated: latestReadingLabel,
     },
     {
       key: 'temperature',
@@ -84,7 +89,7 @@ export default function AdminDashboardPage() {
       trend: 'UP',
       status: currentReading.temperature > 30 ? 'WARNING' : 'NORMAL',
       optimalRange: '18 – 28 °C',
-      lastUpdated: 'Just now',
+      lastUpdated: latestReadingLabel,
     },
     {
       key: 'water_level',
@@ -96,7 +101,7 @@ export default function AdminDashboardPage() {
       trend: 'DOWN',
       status: currentReading.water_level < 20 ? 'CRITICAL' : 'NORMAL',
       optimalRange: '30 – 100 %',
-      lastUpdated: 'Just now',
+      lastUpdated: latestReadingLabel,
     },
     {
       key: 'flow_rate',
@@ -108,7 +113,7 @@ export default function AdminDashboardPage() {
       trend: 'STABLE',
       status: 'NORMAL',
       optimalRange: '2.0 – 6.0 L/min',
-      lastUpdated: 'Just now',
+      lastUpdated: latestReadingLabel,
     },
   ];
 
@@ -180,7 +185,7 @@ export default function AdminDashboardPage() {
             Physicochemical Sensor Array Readings
           </span>
           <span className="text-[11px] font-mono text-zinc-500">
-            Node: {selectedTank.code}-ESP32
+            Node: {selectedTank.code}-ESP32 • Latest DB reading: {latestReadingLabel} • UI checked {formatClockTime(lastRefreshTime)}
           </span>
         </div>
 
