@@ -125,18 +125,41 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Greeting + actions */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="font-display text-4xl sm:text-5xl font-medium leading-[1.05] tracking-tight text-[#0B1B22]">
-            Facility water, at a glance
-          </h1>
-          <p className="flex flex-wrap items-center gap-2 text-sm text-[#4C5F69]">
-            <span className="rounded-full bg-[#DCEBF7] px-3 py-1 text-[11px] font-semibold tracking-wider text-[#074677]">
-              LIVE TELEMETRY
-            </span>
-            Real-time physicochemical sensor metrics, automated risk scores, and AI projections
-          </p>
+      {/* Top Controls & Tank Selector */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              <span>Facility Water Dashboard</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300">
+                LIVE TELEMETRY
+              </span>
+            </h1>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Real-time physicochemical sensor metrics, automated risk scores, and AI projections
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant={isLiveUpdating ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setIsLiveUpdating(!isLiveUpdating)}
+              className="text-xs gap-1.5 font-mono"
+            >
+              <Radio className={`h-3 w-3 ${isLiveUpdating ? 'text-black animate-pulse' : 'text-zinc-400'}`} />
+              {isLiveUpdating ? 'Live Stream: ON' : 'Live Stream: OFF'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refreshData()}
+              className="text-xs gap-1.5"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">

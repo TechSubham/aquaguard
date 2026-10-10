@@ -1,60 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  --background: #000000;
-  --foreground: #f4f4f5;
-  --card: #09090b;
-  --card-foreground: #fafafa;
-  --popover: #09090b;
-  --popover-foreground: #fafafa;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #18181b;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #ffffff;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #d4d4d8;
-}
+  --background: #E4EAED;
+  --foreground: #0B1B22;
+  --card: #FFFFFF;
+  --card-foreground: #0B1B22;
+  --popover: #FFFFFF;
+  --popover-foreground: #0B1B22;
+  --primary: #0B1B22;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EEF2F4;
+  --secondary-foreground: #0B1B22;
+  --muted: #F3F6F7;
+  --muted-foreground: #4C5F69;
+  --accent: #0B5FA5;
+  --accent-foreground: #FFFFFF;
+  --destructive: #C8431C;
+  --destructive-foreground: #FFFFFF;
+  --border: #E4EAED;
+  --input: #EEF2F4;
+  --ring: #0B5FA5;
 
-/* Universal Times New Roman typography requested by user */
-* {
-  font-family: "Times New Roman", Times, Georgia, serif !important;
+  --ok: #2E9E7A;  --ok-soft: #DDF3EA;  --ok-ink: #14694B;
+  --warn: #F2B33D; --warn-soft: #FFF0C7; --warn-ink: #6B4800;
+  --crit: #E4572E; --crit-soft: #FBE3DA; --crit-ink: #8F2B0C;
+  --radius-card: 32px;
 }
 
 html, body {
-  background-color: var(--background);
+  background: var(--background);
   color: var(--foreground);
-  font-family: "Times New Roman", Times, Georgia, serif !important;
+  font-family: var(--font-body), system-ui, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
 }
+h1, h2, h3, .font-display { font-family: var(--font-display), sans-serif; letter-spacing: -0.01em; }
 
-button, input, select, textarea, p, span, div, h1, h2, h3, h4, h5, h6, table, th, td, label, a {
-  font-family: "Times New Roman", Times, Georgia, serif !important;
-}
-
-.font-mono, [class*="font-mono"], .font-sans, [class*="font-sans"], .font-serif, [class*="font-serif"] {
-  font-family: "Times New Roman", Times, Georgia, serif !important;
-}
-
-/* Custom scrollbar for sleek black-and-white look */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #09090b;
-}
-::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #B6C3CA; border-radius: 4px; }
