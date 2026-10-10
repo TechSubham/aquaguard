@@ -128,7 +128,7 @@ export default function AdminDashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              <span>Facility Water Intelligence Dashboard</span>
+              <span>Facility Water Dashboard</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300">
                 LIVE TELEMETRY
               </span>
