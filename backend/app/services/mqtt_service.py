@@ -8,7 +8,7 @@ from app.models.tank import Tank
 from app.models.alert import Alert
 from app.models.notification import Notification
 
-MQTT_BROKER = "test.mosquitto.org"
+MQTT_BROKER = "35.157.128.15"
 MQTT_PORT = 1883
 
 MQTT_TOPIC = "aquaguard/A2-ROOF-01/telemetry/readings"

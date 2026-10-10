@@ -24,7 +24,7 @@ const char* WIFI_PASSWORD = "";
 // =========================
 // MQTT
 // =========================
-const char* MQTT_SERVER = "test.mosquitto.org";
+IPAddress MQTT_SERVER(35, 157, 128, 15);
 const int MQTT_PORT = 1883;
 
 const char* MQTT_TOPIC = "aquaguard/A2-ROOF-01/telemetry/readings";
