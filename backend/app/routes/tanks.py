@@ -92,22 +92,17 @@ def get_tank_status(tank_identifier: str, db: Session = Depends(get_db)):
     )
 
     sensor_online = False
-    water_level = 79.9
-    risk_score = 90.0
+    water_level = 0.0
+    risk_score = 0.0
     last_reading_time = None
 
     if latest:
         last_reading_time = latest.recorded_at.isoformat() if latest.recorded_at else None
-        water_level = float(latest.water_level or 79.9)
-        risk_score = float(latest.risk_score or 90.0)
+        water_level = float(latest.water_level) if latest.water_level is not None else 0.0
+        risk_score = float(latest.risk_score) if latest.risk_score is not None else 0.0
         # Check if reading was received in the last 15 minutes
         if latest.recorded_at and (datetime.utcnow() - latest.recorded_at < timedelta(minutes=15)):
             sensor_online = True
-        else:
-            sensor_online = True  # treat as online if IoT simulator runs
-    else:
-        last_reading_time = datetime.utcnow().isoformat()
-        sensor_online = True
 
     # Determine risk category
     if risk_score >= 80:

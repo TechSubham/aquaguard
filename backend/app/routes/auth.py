@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.services.auth_service import hash_password, verify_password, create_access_token, get_current_user
+from app.services.email_service import send_alert_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -87,6 +88,16 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # Trigger Welcome Email
+    try:
+        send_alert_email(
+            to_email=new_user.email,
+            subject="Welcome to AquaGuard NSUT!",
+            message=f"Hi {new_user.name}, your account has been successfully created. You can now monitor campus water quality in real-time."
+        )
+    except Exception as e:
+        print(f"Failed to send welcome email: {e}")
 
     token = create_access_token(new_user.id)
     return {

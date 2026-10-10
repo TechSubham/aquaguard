@@ -7,6 +7,7 @@ from app.models.complaint import Complaint
 from app.models.tank import Tank
 from app.models.user import User
 from app.services.auth_service import get_current_user, require_roles
+from app.services.email_service import send_alert_email
 
 router = APIRouter(prefix="/complaints", tags=["Complaints"])
 
@@ -117,6 +118,15 @@ def update_complaint(
         )
 
     if req.status is not None:
+        if c.status != req.status.upper() and req.status.upper() == "RESOLVED" and c.user and c.user.email:
+            try:
+                send_alert_email(
+                    to_email=c.user.email,
+                    subject="Your AquaGuard Complaint is Resolved",
+                    message=f"The issue you reported regarding '{c.category}' has been marked as RESOLVED by the facilities team. Admin notes: {req.admin_notes or 'None'}"
+                )
+            except Exception as e:
+                print(f"Failed to send complaint resolution email: {e}")
         c.status = req.status.upper()
     if req.admin_notes is not None:
         c.admin_notes = req.admin_notes

@@ -38,21 +38,12 @@ def get_current_user(
             if user:
                 return user
 
-    # 2. Support role override header (convenient for frontend demos / mock switching)
-    if x_user_role:
-        role_lower = x_user_role.lower()
-        user = db.query(User).filter(User.role == role_lower).first()
-        if user:
-            return user
-        # Create virtual user if not in database
-        return User(id=999, name=f"Demo {x_user_role}", email=f"{role_lower}@aquaguard.local", role=role_lower)
 
-    # 3. Default fallback to Admin user for open dev endpoints
-    admin = db.query(User).filter(User.role == "admin").first()
-    if admin:
-        return admin
 
-    return User(id=1, name="Chief Facilities Officer", email="admin.aquaguard@nsut.ac.in", role="admin")
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated"
+    )
 
 
 def require_roles(allowed_roles: List[str]):

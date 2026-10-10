@@ -71,6 +71,12 @@ def _sync_predictive_alerts(db: Session, tank: Tank, prediction: Dict[str, Any])
             db.add(notif)
             db.commit()
             print(f"[AI ALERT] Triggered predictive alert for {tank.tank_code}")
+
+            try:
+                from app.services.email_service import broadcast_severity_alert
+                broadcast_severity_alert(db, tank.tank_code, new_alert.severity, title, msg)
+            except Exception as e:
+                print(f"Error triggering email broadcast: {e}")
         else:
             # Update existing alert
             active_pred_alert.ai_probability = prediction.get("risk_probability")
@@ -99,8 +105,13 @@ def _sync_predictive_alerts(db: Session, tank: Tank, prediction: Dict[str, Any])
                 ai_probability=prediction.get("anomaly_details", {}).get("anomaly_probability"),
                 status="OPEN"
             )
-            db.add(new_ano_alert)
             db.commit()
+            
+            try:
+                from app.services.email_service import broadcast_severity_alert
+                broadcast_severity_alert(db, tank.tank_code, new_ano_alert.severity, new_ano_alert.title, new_ano_alert.message)
+            except Exception as e:
+                print(f"Error triggering anomaly email broadcast: {e}")
 
 
 @router.get("/health")
@@ -403,20 +414,8 @@ def get_tank_prediction(
             }
             for r in reversed(past_readings)
         ]
-    elif profile.get("current"):
-        current_reading = profile["current"]
-        history = profile.get("history", [current_reading])
     else:
-        current_reading = {
-            "ph": 7.2,
-            "tds": 280.0,
-            "turbidity": 1.0,
-            "temperature": 25.0,
-            "water_level": 80.0,
-            "flow_rate": 3.5,
-            "recorded_at": datetime.utcnow().isoformat()
-        }
-        history = [current_reading]
+        return {"status": "offline", "message": "Sensors are offline. No telemetry data found."}
 
     recent_complaints = []
     if complaint_objs:
@@ -493,8 +492,9 @@ def run_custom_prediction(
         tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
         if tank:
             _sync_predictive_alerts(db, tank, prediction)
-    except Exception:
-        pass
+    except Exception as e:
+        import traceback
+        prediction["sync_error"] = traceback.format_exc()
 
     return prediction
 

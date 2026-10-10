@@ -56,10 +56,19 @@ def get_latest_reading(
     )
 
     if not reading:
-        raise HTTPException(
-            status_code=404,
-            detail="No sensor readings found"
-        )
+        return {
+            "tank_id": tank.tank_code,
+            "recorded_at": None,
+            "temperature": None,
+            "ph": None,
+            "tds": None,
+            "turbidity": None,
+            "water_level": None,
+            "flow_rate": None,
+            "risk_score": None,
+            "ai_risk_probability": None,
+            "has_data": False,
+        }
 
     return {
         "tank_id": tank.tank_code,
@@ -71,7 +80,8 @@ def get_latest_reading(
         "water_level": reading.water_level,
         "flow_rate": reading.flow_rate,
         "risk_score": reading.risk_score,
-        "ai_risk_probability": reading.ai_risk_probability
+        "ai_risk_probability": reading.ai_risk_probability,
+        "has_data": True,
     }
 
 

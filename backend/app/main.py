@@ -16,11 +16,17 @@ from app.routes.leakage import router as leakage_router
 from app.routes.notifications import router as notifications_router
 from app.routes.ai import router as ai_router
 
+from app.services.mqtt_service import start_mqtt
+
 app = FastAPI(
     title="AquaGuard API",
     description="Smart Hostel Water Quality Monitoring & Fleet Management System",
     version="2.0.0"
 )
+
+@app.on_event("startup")
+def startup_event():
+    start_mqtt()
 
 # Enable CORS for Next.js frontend (port 3000) and local access
 app.add_middleware(

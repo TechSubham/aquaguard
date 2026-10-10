@@ -11,13 +11,69 @@ from app.models.notification import Notification
 MQTT_BROKER = "test.mosquitto.org"
 MQTT_PORT = 1883
 
-MQTT_TOPIC = "aquaguard/hostel/A/block/A2/tank/01/readings"
+MQTT_TOPIC = "aquaguard/A2-ROOF-01/telemetry/readings"
+EXPECTED_SENSOR_SOURCE = "wokwi-live-inputs"
 
 # Configured Safe Thresholds (IS 10500 standards)
 TURBIDITY_CRITICAL_THRESHOLD = 5.0  # NTU
 TDS_WARNING_THRESHOLD = 450.0       # ppm
 PH_MIN_THRESHOLD = 6.5
 PH_MAX_THRESHOLD = 8.5
+
+
+def log_telemetry_console(
+    payload: dict,
+    *,
+    topic: str,
+    ingest_status: str,
+    reading_id: int | None = None,
+    ai_risk_score: int | None = None,
+) -> None:
+    """Mirror Wokwi serial monitor output in the backend terminal."""
+    tank_id = payload.get("tank_id", "?")
+    firmware_version = payload.get("firmware_version")
+    sensor_source = payload.get("sensor_source")
+    sim_time = payload.get("simulation_time")
+    temperature = payload.get("temperature")
+    ph = payload.get("ph")
+    tds = payload.get("tds")
+    turbidity = payload.get("turbidity")
+    water_level = payload.get("water_level")
+    flow_rate = payload.get("flow_rate")
+    risk_score = payload.get("risk_score")
+    if ai_risk_score is not None:
+        risk_score = ai_risk_score
+
+    def fmt_num(value, decimals=2):
+        if value is None:
+            return "—"
+        if isinstance(value, float):
+            return f"{value:.{decimals}f}"
+        return str(value)
+
+    lines = [
+        "",
+        "========== Telemetry ==========",
+        f"  tank_id:          {tank_id}",
+        f"  firmware:         {firmware_version or '—'}",
+        f"  sensor_source:    {sensor_source or '—'}",
+        f"  simulation_time:  {fmt_num(sim_time, 0) if sim_time is not None else '—'}",
+        f"  temperature (C):  {fmt_num(temperature, 2)}",
+        f"  ph:               {fmt_num(ph, 2)}",
+        f"  tds (ppm):        {fmt_num(tds, 1)}",
+        f"  turbidity (NTU):  {fmt_num(turbidity, 2)}",
+        f"  water_level (%):  {fmt_num(water_level, 1)}",
+        f"  flow_rate:        {fmt_num(flow_rate, 2)}",
+        f"  risk_score:       {risk_score if risk_score is not None else '—'}",
+        f"  raw_adc pH/TDS/T: {payload.get('raw_ph_adc', '—')} / {payload.get('raw_tds_adc', '—')} / {payload.get('raw_turbidity_adc', '—')}",
+        f"  mqtt_topic:       {topic}",
+        f"  db_ingest:        {ingest_status}",
+    ]
+    if reading_id is not None:
+        lines.append(f"  reading_id:       {reading_id}")
+    lines.append(f"  json:             {json.dumps(payload, separators=(',', ':'))}")
+    lines.append("================================")
+    print("\n".join(lines), flush=True)
 
 
 def validate_reading_payload(payload: dict) -> bool:
@@ -103,6 +159,12 @@ def check_and_manage_threshold_alerts(db, tank: Tank, reading: SensorReading):
             db.add(notif)
             db.commit()
             print(f"[ALERT TRIGGERED] Created new {highest_severity} alert for {tank.tank_code}: {msg}")
+
+            try:
+                from app.services.email_service import broadcast_severity_alert
+                broadcast_severity_alert(db, tank.tank_code, highest_severity, title, msg)
+            except Exception as e:
+                print(f"Error triggering threshold email broadcast: {e}")
         else:
             # Active alert already exists: update message and severity without duplicating
             if active_alert.severity != "CRITICAL" and highest_severity == "CRITICAL":
@@ -144,16 +206,31 @@ def on_message(client, userdata, msg):
     try:
         # 1. Decode MQTT payload
         payload = json.loads(msg.payload.decode("utf-8"))
-        print("\nMQTT DATA RECEIVED:", payload)
+
+        if payload.get("sensor_source") != EXPECTED_SENSOR_SOURCE:
+            log_telemetry_console(
+                payload,
+                topic=msg.topic,
+                ingest_status="SKIPPED (old firmware or unknown sensor source)",
+            )
+            return
 
         # 2. Validate reading
         if not validate_reading_payload(payload):
-            print("Ignoring reading with invalid sensor values")
+            log_telemetry_console(
+                payload,
+                topic=msg.topic,
+                ingest_status="SKIPPED (invalid sensor values)",
+            )
             return
 
         tank_code = payload.get("tank_id")
         if not tank_code:
-            print("ERROR: tank_id missing from MQTT payload")
+            log_telemetry_console(
+                payload,
+                topic=msg.topic,
+                ingest_status="FAILED (tank_id missing)",
+            )
             return
 
         db = SessionLocal()
@@ -161,7 +238,11 @@ def on_message(client, userdata, msg):
         # 3. Find tank in PostgreSQL
         tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
         if not tank:
-            print(f"ERROR: Tank '{tank_code}' not found in PostgreSQL")
+            log_telemetry_console(
+                payload,
+                topic=msg.topic,
+                ingest_status=f"FAILED (tank '{tank_code}' not in database)",
+            )
             return
 
         # 4. Fetch recent history for AI temporal feature extraction
@@ -217,7 +298,14 @@ def on_message(client, userdata, msg):
         db.add(reading)
         db.commit()
         db.refresh(reading)
-        print(f"Reading saved to PostgreSQL (reading ID: {reading.id}, AI Risk: {calculated_risk_score}%)")
+
+        log_telemetry_console(
+            payload,
+            topic=msg.topic,
+            ingest_status="SUCCESS",
+            reading_id=reading.id,
+            ai_risk_score=calculated_risk_score,
+        )
 
         # 6. Check physical thresholds & AI predictive alerts
         check_and_manage_threshold_alerts(db, tank, reading)
@@ -241,7 +329,7 @@ def start_mqtt():
     client.on_message = on_message
     print("Connecting to MQTT broker...")
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    client.loop_forever()
+    client.loop_start()
 
 
 if __name__ == "__main__":

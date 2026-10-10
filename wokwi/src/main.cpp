@@ -1,12 +1,19 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
+#define TEMP_PIN 4
+#define PH_PIN 34
+#define TDS_PIN 35
+#define TURBIDITY_PIN 32
 #define TRIG_PIN 5
 #define ECHO_PIN 18
 #define LED_PIN 2
 
 #define TANK_HEIGHT_CM 100.0
+#define ADC_MAX 4095.0
 
 // =========================
 // WiFi
@@ -20,11 +27,22 @@ const char* WIFI_PASSWORD = "";
 const char* MQTT_SERVER = "test.mosquitto.org";
 const int MQTT_PORT = 1883;
 
-const char* MQTT_TOPIC =
-    "aquaguard/hostel/A/block/A2/tank/01/readings";
+const char* MQTT_TOPIC = "aquaguard/A2-ROOF-01/telemetry/readings";
+
+// =========================
+// Configuration
+// =========================
+const char* TANK_ID = "A2-ROOF-01";
+const char* FIRMWARE_VERSION = "wokwi-live-sensors-v2";
+const unsigned long TELEMETRY_INTERVAL_MS = 5000;
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
+OneWire oneWire(TEMP_PIN);
+DallasTemperature tempSensor(&oneWire);
+float phRaw = 0.0;
+float tdsRaw = 0.0;
+float turbidityRaw = 0.0;
 
 // =========================
 // Connect WiFi
@@ -106,105 +124,50 @@ float readWaterLevel() {
 }
 
 // =========================
-// Simulation
+// Analog virtual sensors
 // =========================
-float getSimulationTime() {
+float readAnalogAverage(int pin) {
 
-    unsigned long elapsed =
-        millis() / 1000;
+    long total = 0;
 
-    return elapsed % 150;
+    for (int i = 0; i < 10; i++) {
+        total += analogRead(pin);
+        delay(5);
+    }
+
+    return total / 10.0;
 }
 
-// =========================
-// pH simulation
-// =========================
-float simulatePH(float t) {
-
-    if (t < 30)
-        return 7.2;
-
-    if (t < 60)
-        return 7.2 - ((t - 30) * 0.01);
-
-    if (t < 90)
-        return 6.9 - ((t - 60) * 0.015);
-
-    if (t < 120)
-        return 6.45 - ((t - 90) * 0.005);
-
-    return 7.1;
-}
-
-// =========================
-// TDS simulation
-// =========================
-float simulateTDS(float t) {
-
-    if (t < 30)
-        return 280;
-
-    if (t < 60)
-        return 280 + ((t - 30) * 2.0);
-
-    if (t < 90)
-        return 340 + ((t - 60) * 4.0);
-
-    if (t < 120)
-        return 460 + ((t - 90) * 2.0);
-
-    return 285;
-}
-
-// =========================
-// Turbidity simulation
-// =========================
-float simulateTurbidity(float t) {
-
-    if (t < 30)
-        return 1.0;
-
-    if (t < 60)
-        return 1.0 + ((t - 30) * 0.05);
-
-    if (t < 90)
-        return 2.5 + ((t - 60) * 0.12);
-
-    if (t < 120)
-        return 6.1 + ((t - 90) * 0.06);
-
-    return 1.1;
-}
-
-// =========================
-// Temperature simulation
-// =========================
-float simulateTemperature(float t) {
-
-    if (t < 60)
+float readTemperature() {
+    tempSensor.requestTemperatures();
+    float value = tempSensor.getTempCByIndex(0);
+    if (value == DEVICE_DISCONNECTED_C) {
         return 25.0;
-
-    if (t < 120)
-        return 25.0 + ((t - 60) * 0.03);
-
-    return 25.2;
+    }
+    return value;
 }
 
-// =========================
-// Flow simulation
-// =========================
-float simulateFlowRate(float t) {
+float readPH() {
+    phRaw = readAnalogAverage(PH_PIN);
+    return constrain((phRaw / ADC_MAX) * 14.0, 0.0, 14.0);
+}
 
-    if (t < 60)
-        return 2.0;
+float readTDS() {
+    tdsRaw = readAnalogAverage(TDS_PIN);
+    return constrain((tdsRaw / ADC_MAX) * 1000.0, 0.0, 1000.0);
+}
 
-    if (t < 90)
-        return 2.2;
+float readTurbidity() {
+    turbidityRaw = readAnalogAverage(TURBIDITY_PIN);
+    return constrain((turbidityRaw / ADC_MAX) * 10.0, 0.0, 10.0);
+}
 
-    if (t < 120)
-        return 3.5;
+float readFlowRate(float waterLevel) {
+    return waterLevel > 5.0 ? 2.0 + ((100.0 - waterLevel) / 100.0) * 4.0 : 0.0;
+}
 
-    return 2.0;
+float getSimulationTime() {
+    return millis() / 1000;
 }
 
 // =========================
@@ -246,10 +209,23 @@ int calculateRisk(
 void setup() {
 
     Serial.begin(115200);
+    Serial.setDebugOutput(true);
+    delay(500);
+    Serial.println();
+    Serial.println("BOOT: AquaGuard Wokwi firmware started");
+    Serial.print("AquaGuard simulator | tank: ");
+    Serial.println(TANK_ID);
 
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
     pinMode(LED_PIN, OUTPUT);
+    pinMode(PH_PIN, INPUT);
+    pinMode(TDS_PIN, INPUT);
+    pinMode(TURBIDITY_PIN, INPUT);
+
+    analogReadResolution(12);
+    analogSetAttenuation(ADC_11db);
+    tempSensor.begin();
 
     randomSeed(micros());
 
@@ -275,24 +251,24 @@ void loop() {
     // Simulation time
     float t = getSimulationTime();
 
-    // Sensor values
+    // Sensor values from Wokwi virtual inputs
     float temperature =
-        simulateTemperature(t);
+        readTemperature();
 
     float ph =
-        simulatePH(t);
+        readPH();
 
     float tds =
-        simulateTDS(t);
+        readTDS();
 
     float turbidity =
-        simulateTurbidity(t);
+        readTurbidity();
 
     float waterLevel =
         readWaterLevel();
 
     float flowRate =
-        simulateFlowRate(t);
+        readFlowRate(waterLevel);
 
     int risk =
         calculateRisk(
@@ -318,7 +294,9 @@ void loop() {
         sizeof(payload),
 
         "{"
-        "\"tank_id\":\"A2-ROOF-01\","
+        "\"tank_id\":\"%s\","
+        "\"firmware_version\":\"%s\","
+        "\"sensor_source\":\"wokwi-live-inputs\","
         "\"simulation_time\":%.0f,"
         "\"temperature\":%.2f,"
         "\"ph\":%.2f,"
@@ -326,9 +304,14 @@ void loop() {
         "\"turbidity\":%.2f,"
         "\"water_level\":%.1f,"
         "\"flow_rate\":%.2f,"
-        "\"risk_score\":%d"
+        "\"risk_score\":%d,"
+        "\"raw_ph_adc\":%.0f,"
+        "\"raw_tds_adc\":%.0f,"
+        "\"raw_turbidity_adc\":%.0f"
         "}",
-
+        
+        TANK_ID,
+        FIRMWARE_VERSION,
         t,
         temperature,
         ph,
@@ -336,7 +319,10 @@ void loop() {
         turbidity,
         waterLevel,
         flowRate,
-        risk
+        risk,
+        phRaw,
+        tdsRaw,
+        turbidityRaw
     );
 
     // =========================
@@ -349,15 +335,41 @@ void loop() {
             payload
         );
 
-    Serial.print("MQTT publish: ");
-
-    if (published)
-        Serial.println("SUCCESS");
-    else
-        Serial.println("FAILED");
-
-    Serial.print("Payload: ");
+    Serial.println();
+    Serial.println("========== Telemetry ==========");
+    Serial.print("  tank_id:          ");
+    Serial.println(TANK_ID);
+    Serial.print("  firmware:         ");
+    Serial.println(FIRMWARE_VERSION);
+    Serial.print("  simulation_time:  ");
+    Serial.println(t, 0);
+    Serial.print("  temperature (C):  ");
+    Serial.println(temperature, 2);
+    Serial.print("  ph:               ");
+    Serial.println(ph, 2);
+    Serial.print("  tds (ppm):        ");
+    Serial.println(tds, 1);
+    Serial.print("  turbidity (NTU):  ");
+    Serial.println(turbidity, 2);
+    Serial.print("  raw_adc pH/TDS/T: ");
+    Serial.print(phRaw, 0);
+    Serial.print(" / ");
+    Serial.print(tdsRaw, 0);
+    Serial.print(" / ");
+    Serial.println(turbidityRaw, 0);
+    Serial.print("  water_level (%):  ");
+    Serial.println(waterLevel, 1);
+    Serial.print("  flow_rate:        ");
+    Serial.println(flowRate, 2);
+    Serial.print("  risk_score:       ");
+    Serial.println(risk);
+    Serial.print("  mqtt_topic:       ");
+    Serial.println(MQTT_TOPIC);
+    Serial.print("  mqtt_publish:     ");
+    Serial.println(published ? "SUCCESS" : "FAILED");
+    Serial.print("  json:             ");
     Serial.println(payload);
+    Serial.println("================================");
 
-    delay(2000);
+    delay(TELEMETRY_INTERVAL_MS);
 }
