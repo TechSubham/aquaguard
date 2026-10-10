@@ -16,6 +16,7 @@ type MetricKey = 'turbidity' | 'tds' | 'ph' | 'temperature';
 
 interface MetricConfig {
   label: string;
+  title: string;
   unit: string;
   threshold?: number;
   thresholdLabel?: string;
@@ -26,52 +27,57 @@ interface MetricConfig {
 const METRICS: Record<MetricKey, MetricConfig> = {
   turbidity: {
     label: 'Turbidity',
+    title: 'Turbidity Sensor History (Optical Backscatter)',
     unit: 'NTU',
     threshold: 5.0,
     thresholdLabel: 'Safety Limit (5.0 NTU)',
-    color: '#ffffff',
+    color: '#0284C7',
     decimals: 2,
   },
   tds: {
-    label: 'TDS (Dissolved Solids)',
+    label: 'TDS',
+    title: 'Total Dissolved Solids (TDS) History (Conductivity Cell)',
     unit: 'ppm',
     threshold: 500,
     thresholdLabel: 'Acceptable Limit (500 ppm)',
-    color: '#ffffff',
+    color: '#0284C7',
     decimals: 0,
   },
   ph: {
     label: 'pH Level',
+    title: 'pH History (Electrochemical Probe)',
     unit: 'pH',
     threshold: 6.5,
     thresholdLabel: 'Lower Boundary (6.5 pH)',
-    color: '#ffffff',
+    color: '#0284C7',
     decimals: 2,
   },
   temperature: {
     label: 'Temperature',
+    title: 'Temperature History (PT100 RTD Probe)',
     unit: '°C',
     threshold: 28,
     thresholdLabel: 'Threshold (28 °C)',
-    color: '#ffffff',
+    color: '#0284C7',
     decimals: 1,
   },
 };
 
-export function WaterQualityChart({ data, title = 'Water Quality Trends & Historical Telemetry', defaultMetric = 'turbidity' }: WaterQualityChartProps) {
+export function WaterQualityChart({ data, title, defaultMetric = 'turbidity' }: WaterQualityChartProps) {
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>(defaultMetric);
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; val: number; time: string } | null>(null);
   const isMounted = useIsClientMounted();
 
   if (!data || data.length === 0) {
     return (
-      <Card className="p-8 text-center text-zinc-500 font-mono text-xs">
+      <Card className="p-8 text-center text-slate-500 font-mono text-xs bg-white">
         No telemetry history recorded for selected sensor node.
       </Card>
     );
   }
 
   const metricConfig = METRICS[selectedMetric];
+  const chartTitle = title || metricConfig.title;
   const values = data.map((d) => d[selectedMetric]);
   const minVal = Math.min(...values);
   const maxVal = Math.max(...values);
@@ -109,20 +115,20 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
       : null;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-4">
+    <Card className="border border-slate-200/90 bg-white shadow-sm">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-4 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-zinc-300" />
-            <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+            <Activity className="h-4 w-4 text-[#0284C7]" />
+            <CardTitle className="text-base font-bold text-slate-900">{chartTitle}</CardTitle>
           </div>
-          <CardDescription>
+          <CardDescription className="text-xs text-slate-900 mt-0.5">
             24-hour continuous sensor timeline • Automated 5-second delta tracking
           </CardDescription>
         </div>
 
         {/* Metric Selector Tabs */}
-        <div className="flex items-center rounded-lg border border-zinc-800 bg-zinc-950 p-1 overflow-x-auto">
+        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1 overflow-x-auto shadow-inner">
           {(Object.keys(METRICS) as MetricKey[]).map((key) => (
             <button
               key={key}
@@ -130,41 +136,42 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                 setSelectedMetric(key);
                 setHoveredPoint(null);
               }}
-              className={`px-3 py-1 text-xs font-mono rounded-md transition-all whitespace-nowrap ${selectedMetric === key
-                  ? 'bg-white text-black font-bold shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
-                }`}
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                selectedMetric === key
+                  ? 'bg-[#0284C7] text-white font-bold shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+              }`}
             >
-              {METRICS[key].label.split(' ')[0]}
+              {METRICS[key].label}
             </button>
           ))}
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="pt-4">
         {/* Metric Summary Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 pb-3 border-b border-zinc-800/80 font-mono text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 pb-3 border-b border-slate-100 font-mono text-xs">
           <div>
-            <span className="text-[10px] text-zinc-500 uppercase block">Current</span>
-            <span className="text-base font-bold text-white">
+            <span className="text-[10px] text-slate-500 uppercase font-semibold block">Current</span>
+            <span className="text-base font-bold text-[#0284C7]">
               {formatNumber(values[values.length - 1], metricConfig.decimals)} {metricConfig.unit}
             </span>
           </div>
           <div>
-            <span className="text-[10px] text-zinc-500 uppercase block">24h Peak</span>
-            <span className="text-base font-semibold text-zinc-300">
+            <span className="text-[10px] text-slate-500 uppercase font-semibold block">24h Peak</span>
+            <span className="text-base font-bold text-slate-800">
               {formatNumber(maxVal, metricConfig.decimals)} {metricConfig.unit}
             </span>
           </div>
           <div>
-            <span className="text-[10px] text-zinc-500 uppercase block">24h Minimum</span>
-            <span className="text-base font-semibold text-zinc-300">
+            <span className="text-[10px] text-slate-500 uppercase font-semibold block">24h Minimum</span>
+            <span className="text-base font-bold text-slate-800">
               {formatNumber(minVal, metricConfig.decimals)} {metricConfig.unit}
             </span>
           </div>
           <div>
-            <span className="text-[10px] text-zinc-500 uppercase block">Safety Threshold</span>
-            <span className="text-base font-semibold text-zinc-400">
+            <span className="text-[10px] text-slate-500 uppercase font-semibold block">Safety Threshold</span>
+            <span className="text-base font-bold text-slate-600">
               {metricConfig.threshold ? `${metricConfig.threshold} ${metricConfig.unit}` : 'Standard'}
             </span>
           </div>
@@ -175,8 +182,8 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
           <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto select-none overflow-visible">
             <defs>
               <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#ffffff" stopOpacity="0.0" />
+                <stop offset="0%" stopColor="#0284C7" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#0284C7" stopOpacity="0.0" />
               </linearGradient>
             </defs>
 
@@ -191,7 +198,7 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                     y1={y}
                     x2={width - padRight}
                     y2={y}
-                    stroke="#27272a"
+                    stroke="#E2E8F0"
                     strokeDasharray="3 3"
                     strokeWidth="1"
                   />
@@ -199,7 +206,7 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                     x={padLeft - 8}
                     y={y + 4}
                     textAnchor="end"
-                    fill="#71717a"
+                    fill="#64748B"
                     fontSize="10"
                     fontFamily="monospace"
                   >
@@ -217,7 +224,7 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                   y1={thresholdY}
                   x2={width - padRight}
                   y2={thresholdY}
-                  stroke="#ef4444"
+                  stroke="#EF4444"
                   strokeDasharray="4 4"
                   strokeWidth="1.5"
                 />
@@ -225,7 +232,7 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                   x={width - padRight - 8}
                   y={thresholdY - 6}
                   textAnchor="end"
-                  fill="#ef4444"
+                  fill="#EF4444"
                   fontSize="9"
                   fontFamily="monospace"
                   fontWeight="bold"
@@ -238,11 +245,11 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
             {/* Area Fill */}
             <path d={areaD} fill="url(#areaGradient)" />
 
-            {/* Trend Line */}
+            {/* Trend Line (Vibrant Ocean Azure Blue) */}
             <path
               d={pathD}
               fill="none"
-              stroke="#ffffff"
+              stroke="#0284C7"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -259,7 +266,7 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                   cx={pt.x}
                   cy={pt.y}
                   r="4"
-                  fill="#000000"
+                  fill="#0284C7"
                   stroke="#ffffff"
                   strokeWidth="2"
                   className="transition-transform group-hover:scale-150"
@@ -275,20 +282,21 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                   y1={padTop}
                   x2={hoveredPoint.x}
                   y2={padTop + plotHeight}
-                  stroke="#a1a1aa"
+                  stroke="#94A3B8"
                   strokeWidth="1"
                   strokeDasharray="2 2"
                 />
-                <circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="6" fill="#ffffff" stroke="#000000" strokeWidth="2" />
+                <circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="6" fill="#0284C7" stroke="#ffffff" strokeWidth="2.5" />
                 <rect
                   x={Math.min(width - 150, Math.max(padLeft, hoveredPoint.x - 70))}
                   y={Math.max(5, hoveredPoint.y - 45)}
                   width="140"
                   height="36"
-                  rx="6"
-                  fill="#09090b"
-                  stroke="#52525b"
+                  rx="8"
+                  fill="#0F172A"
+                  stroke="#334155"
                   strokeWidth="1"
+                  filter="drop-shadow(0 4px 6px rgba(0,0,0,0.15))"
                 />
                 <text
                   x={Math.min(width - 80, Math.max(padLeft + 70, hoveredPoint.x))}
@@ -305,7 +313,7 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
                   x={Math.min(width - 80, Math.max(padLeft + 70, hoveredPoint.x))}
                   y={Math.max(5, hoveredPoint.y - 45) + 29}
                   textAnchor="middle"
-                  fill="#a1a1aa"
+                  fill="#94A3B8"
                   fontSize="9"
                   fontFamily="monospace"
                 >
@@ -316,7 +324,7 @@ export function WaterQualityChart({ data, title = 'Water Quality Trends & Histor
 
             {/* Time labels across X Axis */}
             {points.filter((_, idx) => idx % 6 === 0 || idx === points.length - 1).map((pt, i) => (
-              <text key={i} x={pt.x} y={padTop + plotHeight + 20} textAnchor="middle" fill="#71717a" fontSize="9" fontFamily="monospace">
+              <text key={i} x={pt.x} y={padTop + plotHeight + 20} textAnchor="middle" fill="#64748B" fontSize="9" fontFamily="monospace">
                 {isMounted ? formatClockTime(pt.time) : ''}
               </text>
             ))}

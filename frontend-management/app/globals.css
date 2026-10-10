@@ -1,7 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #E4EAED;
+  --background: #F3F4F6;
   --foreground: #0B1B22;
   --card: #FFFFFF;
   --card-foreground: #0B1B22;
@@ -9,32 +10,59 @@
   --popover-foreground: #0B1B22;
   --primary: #0B1B22;
   --primary-foreground: #FFFFFF;
-  --secondary: #EEF2F4;
+  --secondary: #EEF2F5;
   --secondary-foreground: #0B1B22;
-  --muted: #F3F6F7;
-  --muted-foreground: #4C5F69;
-  --accent: #0B5FA5;
+  --muted: #F8FAFC;
+  --muted-foreground: #64748B;
+  --accent: #0284C7;
   --accent-foreground: #FFFFFF;
-  --destructive: #C8431C;
+  --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
-  --border: #E4EAED;
-  --input: #EEF2F4;
-  --ring: #0B5FA5;
+  --border: #E5E7EB;
+  --input: #F1F4F7;
+  --ring: #0284C7;
 
-  --ok: #2E9E7A;  --ok-soft: #DDF3EA;  --ok-ink: #14694B;
-  --warn: #F2B33D; --warn-soft: #FFF0C7; --warn-ink: #6B4800;
-  --crit: #E4572E; --crit-soft: #FBE3DA; --crit-ink: #8F2B0C;
-  --radius-card: 32px;
+  --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
 
 html, body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-body), system-ui, sans-serif;
+  background-color: #F3F4F6;
+  color: #0B1B22;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
-h1, h2, h3, .font-display { font-family: var(--font-display), sans-serif; letter-spacing: -0.01em; }
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #B6C3CA; border-radius: 4px; }
+h1, h2, h3, h4, .font-display {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.025em;
+}
+
+/* Custom Neo-Morphic / Sleek Pill Shadows */
+.pill-shadow {
+  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+}
+
+.card-elevated {
+  background-color: #FFFFFF;
+  border-radius: 28px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.03), 0 1px 3px -1px rgba(15, 23, 42, 0.02);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
