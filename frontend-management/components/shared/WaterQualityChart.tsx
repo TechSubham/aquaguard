@@ -122,9 +122,9 @@ export function WaterQualityChart({ data, title, defaultMetric = 'turbidity' }: 
             <Activity className="h-4 w-4 text-[#0284C7]" />
             <CardTitle className="text-base font-bold text-slate-900">{chartTitle}</CardTitle>
           </div>
-          <CardDescription className="text-xs text-slate-900 mt-0.5">
-            24-hour continuous sensor timeline • Automated 5-second delta tracking
-          </CardDescription>
+          {/* <CardDescription className="text-xs text-slate-900 mt-0.5">
+            24-hour continuous sensor timeline  |  Automated 5-second delta tracking
+          </CardDescription> */}
         </div>
 
         {/* Metric Selector Tabs */}

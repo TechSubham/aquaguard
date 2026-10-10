@@ -63,18 +63,18 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
         <div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#0B1B22]">
-            Good morning, William!
+            Good morning, Ranjeet!
           </h1>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
+          {/* <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
             Campus water facilities operational • All IoT nodes reporting nominal flow
-          </p>
+          </p> */}
         </div>
 
         <div className="flex items-center gap-3">
           <Link href="/admin/water-tests">
             <button className="rounded-full bg-[#0B1B22] hover:bg-black text-white font-semibold text-xs sm:text-sm px-5 py-2.5 shadow-sm transition-all flex items-center gap-2 group cursor-pointer">
               <Plus className="h-4 w-4 transition-transform group-hover:rotate-90" />
-              <span>+ New water test</span>
+              <span>New water sample test</span>
             </button>
           </Link>
         </div>
@@ -84,13 +84,13 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
         {/* Left Pills: Filter, Dropdown, Export */}
         <div className="flex items-center flex-wrap gap-2.5">
-          <button
+          {/* <button
             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
             className="flex items-center gap-2 rounded-full bg-white border border-slate-200/90 px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm transition-all cursor-pointer"
           >
             <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
             <span>Filter</span>
-          </button>
+          </button> */}
 
           <div className="relative">
             <button
@@ -129,14 +129,14 @@ export default function AdminDashboardPage() {
             )}
           </div>
 
-          <button
+          {/* <button
             onClick={() => refreshData()}
             className="flex items-center gap-2 rounded-full bg-white border border-slate-200/90 px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm transition-all cursor-pointer"
             title="Export Telemetry Log"
           >
             <Download className="h-3.5 w-3.5 text-slate-500" />
             <span>Export</span>
-          </button>
+          </button> */}
 
           {/* Live Stream Toggle Pill */}
           <button

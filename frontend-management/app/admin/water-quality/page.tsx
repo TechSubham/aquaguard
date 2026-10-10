@@ -21,12 +21,12 @@ export default function WaterQualityPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              <Activity className="h-5 w-5 text-[#0284C7]" />
+              <Activity className="h-6 w-6 text-[#0284C7]" />
               <span>Deep Water Quality Analytics & Sensor Monitoring</span>
             </h1>
-            <p className="text-xs text-slate-500 font-mono mt-0.5">
+            {/* <p className="text-xs text-slate-500 font-mono mt-0.5">
               Live multi-parameter sensor readings and dedicated individual time-series histories
-            </p>
+            </p> */}
           </div>
 
           <div className="flex items-center gap-2">

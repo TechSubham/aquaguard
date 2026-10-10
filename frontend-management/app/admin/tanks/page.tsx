@@ -63,11 +63,10 @@ export default function TanksPage() {
               <button
                 key={b}
                 onClick={() => setSelectedBlockFilter(b)}
-                className={`px-2.5 py-1 rounded text-xs transition-colors ${
-                  selectedBlockFilter === b
+                className={`px-2.5 py-1 rounded text-xs transition-colors ${selectedBlockFilter === b
                     ? 'bg-[#0284C7] text-white font-bold shadow-sm'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {b}
               </button>
@@ -81,9 +80,8 @@ export default function TanksPage() {
         {filteredTanks.map((tank) => (
           <Card
             key={tank.id}
-            className={`rounded-2xl border border-sky-200 bg-gradient-to-br from-[#E0F2FE] via-[#F0F9FF] to-[#E0F7FA] text-slate-900 shadow-sm hover:shadow-md transition-all ${
-              tank.riskStatus === 'CRITICAL' ? 'ring-2 ring-red-400/50' : ''
-            }`}
+            className={`rounded-2xl border border-sky-200 bg-gradient-to-br from-[#E0F2FE] via-[#F0F9FF] to-[#E0F7FA] text-slate-900 shadow-sm hover:shadow-md transition-all ${tank.riskStatus === 'CRITICAL' ? 'ring-2 ring-black/10' : ''
+              }`}
           >
             <CardHeader className="flex flex-row items-start justify-between pb-3">
               <div>
@@ -126,11 +124,10 @@ export default function TanksPage() {
                 </div>
                 <div className="w-full bg-sky-200/80 rounded-full h-2.5 border border-sky-300/60 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      tank.waterLevelPercent < 25
+                    className={`h-full rounded-full transition-all duration-700 ${tank.waterLevelPercent < 25
                         ? 'bg-red-500'
                         : 'bg-gradient-to-r from-[#0284C7] to-[#38BDF8]'
-                    }`}
+                      }`}
                     style={{ width: `${tank.waterLevelPercent}%` }}
                   />
                 </div>
