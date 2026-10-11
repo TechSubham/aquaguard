@@ -26,6 +26,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 type BackendTank = {
   tank_code: string;
+  hostel_id?: number | string | null;
   block_name?: string | null;
   hostel_name?: string | null;
   capacity_liters?: number | string | null;
@@ -145,8 +146,8 @@ export async function fetchTanks(): Promise<Tank[]> {
             id: t.tank_code,
             code: t.tank_code,
             name: matchMock?.name ?? `${t.block_name || 'Block A'} Main Header`,
-            hostelId: matchMock?.hostelId ?? 'hostel-ramanujan',
-            hostel: matchMock?.hostel ?? t.hostel_name ?? 'Ramanujan Hostel (Boys Hostel 1)',
+            hostelId: t.hostel_id ? `hostel-${t.hostel_id}` : matchMock?.hostelId ?? 'hostel-ramanujan',
+            hostel: t.hostel_name ?? matchMock?.hostel ?? 'Ramanujan Hostel (Boys Hostel 1)',
             block: t.block_name || matchMock?.block || 'Block A',
             capacityLiters: Number(t.capacity_liters || matchMock?.capacityLiters || 10000),
             waterLevelPercent: Number(status?.water_level ?? matchMock?.waterLevelPercent ?? 79.9),
@@ -179,15 +180,15 @@ export async function fetchHostelsApi(): Promise<Hostel[]> {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         return data.map((h: any) => {
-          const matchMock = INITIAL_HOSTELS.find((m) => m.name.toLowerCase().includes(h.name.toLowerCase()));
+          const matchMock = INITIAL_HOSTELS.find((m) => m.name.toLowerCase() === h.name.toLowerCase());
           return {
-            id: matchMock?.id ?? `hostel-${h.id}`,
+            id: `hostel-${h.id}`,
             code: matchMock?.code ?? `H-${h.id}`,
             name: h.name,
             campus: h.location || matchMock?.campus || 'NSUT Main Campus',
             type: (matchMock?.type ?? ((h.name.toLowerCase().includes('girl') || h.name.toLowerCase().includes('sarojini') || h.name.toLowerCase().includes('kalpana')) ? 'GIRLS' : 'BOYS')),
             blocks: h.blocks?.map((b: any) => b.name) || matchMock?.blocks || ['Block A'],
-            totalTanks: matchMock?.totalTanks ?? 2,
+            totalTanks: matchMock?.totalTanks ?? 1,
           };
         });
       }

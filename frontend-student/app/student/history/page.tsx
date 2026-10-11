@@ -3,127 +3,161 @@
 import React from 'react';
 import Link from 'next/link';
 import { useAquaGuard } from '@/lib/store';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  ClipboardList,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  MessageSquareWarning,
-  Plus,
-  ArrowRight,
-  ShieldCheck,
-} from 'lucide-react';
+import { Plus, Clock, MessageSquareText, Inbox, Search, BadgeCheck, ArrowRight } from 'lucide-react';
+
+const COLUMNS = [
+  {
+    key: 'OPEN',
+    title: 'Open',
+    sub: 'Waiting to be picked up',
+    icon: <Inbox className="h-4 w-4" />,
+    head: 'bg-white text-blue-700 ring-1 ring-blue-200',
+    badge: 'bg-blue-50 text-blue-700',
+    bar: 'bg-blue-300',
+  },
+  {
+    key: 'INVESTIGATING',
+    title: 'In progress',
+    sub: 'Team is on it',
+    icon: <Search className="h-4 w-4" />,
+    head: 'bg-blue-600 text-white',
+    badge: 'bg-white/25 text-white',
+    bar: 'bg-blue-600',
+  },
+  {
+    key: 'RESOLVED',
+    title: 'Resolved',
+    sub: 'All sorted',
+    icon: <BadgeCheck className="h-4 w-4" />,
+    head: 'bg-sky-200 text-sky-900',
+    badge: 'bg-white/60 text-sky-900',
+    bar: 'bg-sky-300',
+  },
+] as const;
 
 export default function StudentHistoryPage() {
   const { complaints } = useAquaGuard();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 rounded-3xl bg-gradient-to-b from-white to-blue-50 p-5 pb-7 ring-1 ring-blue-100">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+      <header className="flex items-center justify-between gap-3">
         <div>
-          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-            Resolution Tracker
-          </span>
-          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2 mt-0.5">
-            <ClipboardList className="h-5 w-5 text-white" />
-            My Complaints
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">
+            Complaint <span className="text-blue-600">board</span>
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Real-time status of your logged water safety grievances and technician dispatch logs.
+          <p className="mt-1 text-xs text-slate-500">
+            Swipe across to follow each report from open to resolved.
           </p>
         </div>
-
-        <Link href="/student/complaints">
-          <Button size="sm" className="text-xs flex items-center gap-1.5 font-bold">
-            <Plus className="h-3.5 w-3.5" />
-            New Report
-          </Button>
+        <Link
+          href="/student/complaints"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-300/50 transition hover:bg-blue-700"
+        >
+          <Plus className="h-4 w-4" /> New
         </Link>
-      </div>
+      </header>
 
-      {/* Complaints List matching user prompt section 9 */}
-      <div className="space-y-4">
-        {complaints.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl border border-zinc-800 bg-zinc-950 space-y-3">
-            <CheckCircle2 className="h-10 w-10 text-zinc-600 mx-auto" />
-            <h3 className="text-sm font-bold text-white">No Active Grievances</h3>
-            <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-              You haven&apos;t filed any water quality tickets. If you observe strange odors or cloudy water, submit a report.
-            </p>
-            <Link href="/student/complaints">
-              <Button size="sm" variant="outline" className="mt-2 text-xs">
-                Report Water Problem
-              </Button>
-            </Link>
+      {complaints.length === 0 ? (
+        <div className="rounded-3xl bg-white px-6 py-12 text-center ring-1 ring-blue-100">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+            <Inbox className="h-7 w-7" />
           </div>
-        ) : (
-          complaints.map((item) => {
-            const isInvestigating = item.status === 'INVESTIGATING';
-            const isResolved = item.status === 'RESOLVED';
-            const isOpen = item.status === 'OPEN';
+          <h3 className="mt-3 text-sm font-extrabold text-slate-900">Your board is empty</h3>
+          <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-slate-500">
+            When you report a water problem it will show up here and move across as the team works on it.
+          </p>
+          <Link
+            href="/student/complaints"
+            className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline"
+          >
+            Report a problem <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      ) : (
+        <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-3">
+          {COLUMNS.map((col) => {
+            const items = complaints.filter((c) => c.status === col.key);
 
             return (
-              <div
-                key={item.id}
-                className="p-5 rounded-2xl border border-zinc-800 bg-zinc-950 space-y-3 hover:border-zinc-700 transition-all"
-              >
-                {/* Top header row */}
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-extrabold text-white">{item.id}</span>
-                    <span className="text-xs text-zinc-500 font-mono">• {item.block}</span>
+              <section key={col.key} className="w-[82%] shrink-0 snap-center sm:w-72">
+                {/* Column header */}
+                <div className={`flex items-center justify-between rounded-2xl px-4 py-3 ${col.head}`}>
+                  <div className="flex items-center gap-2.5">
+                    {col.icon}
+                    <div className="leading-tight">
+                      <p className="text-sm font-extrabold">{col.title}</p>
+                      <p className="text-[10px] opacity-70">{col.sub}</p>
+                    </div>
                   </div>
-
-                  {/* Status Badge from user prompt: 🟡 Investigating / 🟢 Resolved / 🔴 Open */}
-                  <Badge
-                    variant={
-                      isOpen ? 'danger' : isInvestigating ? 'outline' : 'secondary'
-                    }
-                    className="font-mono text-[10px]"
-                  >
-                    {isInvestigating
-                      ? '🟡 Investigating'
-                      : isResolved
-                      ? '🟢 Resolved'
-                      : '🔴 Open'}
-                  </Badge>
+                  <span className={`flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-black ${col.badge}`}>
+                    {items.length}
+                  </span>
                 </div>
 
-                {/* Primary Issue & Description */}
-                <div>
-                  <div className="text-sm font-bold text-white">
-                    {item.issues.join(', ')}
-                  </div>
-                  <p className="text-xs text-zinc-300 mt-1 leading-relaxed">
-                    &quot;{item.description}&quot;
-                  </p>
-                </div>
+                {/* Cards */}
+                <div className="mt-3 space-y-3">
+                  {items.length === 0 ? (
+                    <div className="rounded-2xl border-2 border-dashed border-blue-200 px-4 py-8 text-center text-[11px] text-blue-300">
+                      Nothing here
+                    </div>
+                  ) : (
+                    items.map((item) => (
+                      <article
+                        key={item.id}
+                        className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-[0_8px_20px_-12px_rgba(37,99,235,0.35)] ring-1 ring-blue-100"
+                      >
+                        <span className={`absolute inset-x-0 top-0 h-1 ${col.bar}`} />
 
-                {/* Admin / Facilities Update note if present */}
-                {item.adminNotes && (
-                  <div className="p-3 rounded-lg bg-black border border-zinc-800 text-xs font-mono space-y-1">
-                    <span className="text-[10px] text-zinc-500 uppercase block">Facilities Update:</span>
-                    <p className="text-zinc-300">{item.adminNotes}</p>
-                  </div>
-                )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-black tracking-tight text-blue-700">{item.id}</span>
+                          <span className="max-w-[55%] truncate text-[10px] font-medium text-slate-400">
+                            {item.block}
+                          </span>
+                        </div>
 
-                {/* Footer submission date */}
-                <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-500">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3 w-3" />
-                    <span>Submitted: {item.submittedAt}</span>
-                  </div>
-                  <span>Assigned: Facilities Plumbing Team</span>
+                        <div className="mt-2.5 flex flex-wrap gap-1.5">
+                          {item.issues.map((issue: string) => (
+                            <span
+                              key={issue}
+                              className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700"
+                            >
+                              {issue}
+                            </span>
+                          ))}
+                        </div>
+
+                        <p className="mt-2.5 line-clamp-3 text-xs leading-relaxed text-slate-600">
+                          {item.description}
+                        </p>
+
+                        {item.adminNotes && (
+                          <div className="mt-3 flex gap-2 rounded-xl bg-sky-50 p-2.5 ring-1 ring-sky-100">
+                            <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600" />
+                            <p className="text-[11px] leading-relaxed text-slate-700">{item.adminNotes}</p>
+                          </div>
+                        )}
+
+                        <div className="mt-3 flex items-center gap-1.5 border-t border-blue-50 pt-2.5 text-[10px] text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          {item.submittedAt}
+                        </div>
+                      </article>
+                    ))
+                  )}
                 </div>
-              </div>
+              </section>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
+
+      {/* Column dots hint */}
+      {complaints.length > 0 && (
+        <p className="text-center text-[10px] font-semibold uppercase tracking-[0.25em] text-blue-300">
+          Open · In progress · Resolved
+        </p>
+      )}
     </div>
   );
 }

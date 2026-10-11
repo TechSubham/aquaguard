@@ -3,16 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAquaGuard } from '@/lib/store';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  MessageSquareWarning,
-  CheckCircle2,
-  Building,
-  ArrowRight,
-  AlertCircle,
-  HelpCircle,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Send } from 'lucide-react';
 
 const COMMON_ISSUES = [
   'Bad smell',
@@ -23,10 +14,34 @@ const COMMON_ISSUES = [
   'Other',
 ];
 
+const STEPS = [
+  { q: 'What did you notice?', hint: 'Pick everything that applies.' },
+  { q: 'Where is it happening?', hint: 'So the team knows where to go.' },
+  { q: 'Anything else we should know?', hint: 'When it started, how bad it looks.' },
+];
+
+const underlineField =
+  'w-full border-0 border-b-2 border-blue-100 bg-transparent px-0 py-3 text-lg font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-300 transition focus:border-blue-600 focus:outline-none focus:ring-0';
+
+/** A small tank that fills as the person moves through the steps */
+function Tank({ percent }: { percent: number }) {
+  return (
+    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-blue-50 ring-2 ring-blue-200">
+      <div
+        className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-blue-600 to-sky-400 transition-all duration-700 ease-out"
+        style={{ height: `${percent}%` }}
+      >
+        <div className="absolute inset-x-0 -top-1 h-2 rounded-[50%] bg-sky-300/80" />
+      </div>
+    </div>
+  );
+}
+
 export default function StudentComplaintPage() {
   const router = useRouter();
   const { session, hostels, selectedHostelId, setSelectedHostelId, selectedHostel, selectedTank, addComplaint } = useAquaGuard();
 
+  const [step, setStep] = useState(0);
   const [selectedIssues, setSelectedIssues] = useState<string[]>(['Bad smell']);
   const [description, setDescription] = useState('');
   const [roomNumber, setRoomNumber] = useState(session.room || 'Room 304');
@@ -34,14 +49,30 @@ export default function StudentComplaintPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
 
+  const lastStep = STEPS.length - 1;
+
   const toggleIssue = (issue: string) => {
     setSelectedIssues((prev) =>
       prev.includes(issue) ? prev.filter((i) => i !== issue) : [...prev, issue]
     );
   };
 
+  const canAdvance =
+    step === 0
+      ? selectedIssues.length > 0
+      : step === 1
+      ? roomNumber.trim().length > 0
+      : description.trim().length > 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Enter key on an earlier step just moves forward
+    if (step < lastStep) {
+      if (canAdvance) setStep(step + 1);
+      return;
+    }
+
     if (selectedIssues.length === 0) {
       alert('Please select at least one observed issue.');
       return;
@@ -63,196 +94,237 @@ export default function StudentComplaintPage() {
     setSubmittedTicketId('#105');
   };
 
+  /* ---------------- Success ---------------- */
+  if (submittedTicketId) {
+    return (
+      <div className="flex min-h-[32rem] flex-col justify-between rounded-[2rem] bg-white p-7 ring-1 ring-blue-100">
+        <div>
+          <Tank percent={100} />
+          <p className="mt-8 text-[11px] font-bold uppercase tracking-[0.3em] text-blue-400">Report sent</p>
+          <h1 className="mt-2 text-[5.5rem] font-black leading-none tracking-tighter text-blue-600">
+            {submittedTicketId}
+          </h1>
+          <p className="mt-5 max-w-xs text-sm leading-relaxed text-slate-500">
+            Thank you. Your report is in the facilities queue and someone will take a look soon.
+          </p>
+
+          <dl className="mt-8 divide-y divide-blue-50 border-y border-blue-50 text-sm">
+            <div className="flex justify-between py-3">
+              <dt className="text-slate-400">Where</dt>
+              <dd className="font-bold text-slate-900">
+                {studentBlock}, {roomNumber}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-6 py-3">
+              <dt className="text-slate-400">What</dt>
+              <dd className="text-right font-bold text-slate-900">{selectedIssues.join(', ')}</dd>
+            </div>
+            <div className="flex justify-between py-3">
+              <dt className="text-slate-400">Status</dt>
+              <dd className="font-bold text-blue-600">Investigating</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="mt-8 space-y-3">
+          <button
+            onClick={() => router.push('/student/history')}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-blue-600 py-4 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
+          >
+            Track my complaint <ArrowRight className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => {
+              setSubmittedTicketId(null);
+              setSelectedIssues(['Bad smell']);
+              setDescription('');
+              setStep(0);
+            }}
+            className="w-full py-2 text-sm font-semibold text-blue-600 hover:underline"
+          >
+            File another report
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------- Wizard ---------------- */
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="pb-3 border-b border-zinc-800">
-        <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-          Crowdsourced Facilities Watch
-        </span>
-        <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2 mt-0.5">
-          <MessageSquareWarning className="h-5 w-5 text-white" />
-          Report Water Problem
-        </h1>
-        <p className="text-xs text-zinc-400 mt-1">
-          Notice strange odor, murky color, or chlorine taste? Your report alerts the campus sanitation team instantly.
-        </p>
+    <form
+      onSubmit={handleSubmit}
+      className="flex min-h-[32rem] flex-col rounded-[2rem] bg-white p-7 ring-1 ring-blue-100"
+    >
+      {/* Top: tank + step label */}
+      <div className="flex items-center gap-4">
+        <Tank percent={((step + 1) / STEPS.length) * 100} />
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-blue-400">
+            Report a water problem
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Step {step + 1} of {STEPS.length}
+          </p>
+        </div>
       </div>
 
-      {submittedTicketId ? (
-        /* Submission Success Receipt */
-        <div className="p-6 rounded-2xl border border-white bg-zinc-950 text-center space-y-4 animate-fade-in">
-          <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center mx-auto">
-            <CheckCircle2 className="h-6 w-6" />
-          </div>
+      {/* Question */}
+      <div className="relative mt-8 flex-1">
+        <span className="pointer-events-none absolute -top-6 right-0 select-none text-[7rem] font-black leading-none text-blue-50">
+          0{step + 1}
+        </span>
 
-          <div className="space-y-1">
-            <span className="text-xs font-mono text-zinc-400">Complaint Ticket Dispatched</span>
-            <h2 className="text-2xl font-extrabold font-mono text-white">{submittedTicketId}</h2>
-            <p className="text-xs text-zinc-300 max-w-sm mx-auto pt-1">
-              Your grievance has been logged and assigned to the facilities dispatch queue.
-            </p>
-          </div>
+        <div className="relative">
+          <h1 className="max-w-[16rem] text-[1.75rem] font-black leading-tight tracking-tight text-slate-900">
+            {STEPS[step].q}
+          </h1>
+          <p className="mt-2 text-xs text-slate-400">{STEPS[step].hint}</p>
 
-          <div className="p-3 rounded-lg bg-black border border-zinc-800 text-xs font-mono text-left space-y-1 max-w-sm mx-auto">
-            <div>Block: <span className="text-white font-bold">{studentBlock}</span></div>
-            <div>Room: <span className="text-white font-bold">{roomNumber}</span></div>
-            <div>Issues: <span className="text-white">{selectedIssues.join(', ')}</span></div>
-            <div>Status: <span className="text-white font-bold">🟡 Investigating</span></div>
-          </div>
-
-          <div className="pt-2 flex flex-col sm:flex-row gap-2 max-w-sm mx-auto">
-            <Button
-              className="w-full text-xs font-bold"
-              onClick={() => router.push('/student/history')}
-            >
-              Track in My Complaints
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full text-xs font-bold"
-              onClick={() => {
-                setSubmittedTicketId(null);
-                setSelectedIssues(['Bad smell']);
-                setDescription('');
-              }}
-            >
-              File Another Report
-            </Button>
-          </div>
-        </div>
-      ) : (
-        /* Form matching Section 9 schema */
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider font-mono">
-                1. What did you notice?
-              </CardTitle>
-              <CardDescription>Select all sensory or pressure symptoms observed</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Checkboxes matching user prompt */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="mt-7">
+            {/* Step 1: issues as big rows */}
+            {step === 0 && (
+              <ul className="space-y-2">
                 {COMMON_ISSUES.map((issue) => {
                   const isChecked = selectedIssues.includes(issue);
                   return (
-                    <label
-                      key={issue}
-                      onClick={() => toggleIssue(issue)}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center gap-3 select-none ${
-                        isChecked
-                          ? 'border-white bg-zinc-900 text-white font-semibold'
-                          : 'border-zinc-800 bg-black text-zinc-400 hover:border-zinc-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {}}
-                        className="w-4 h-4 rounded accent-white cursor-pointer"
-                      />
-                      <span className="text-xs font-mono">{issue}</span>
-                    </label>
+                    <li key={issue}>
+                      <button
+                        type="button"
+                        onClick={() => toggleIssue(issue)}
+                        aria-pressed={isChecked}
+                        className={`flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-sm font-bold transition ${
+                          isChecked
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                            : 'bg-blue-50/70 text-slate-700 hover:bg-blue-50'
+                        }`}
+                      >
+                        {issue}
+                        <span
+                          className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+                            isChecked ? 'border-white bg-white text-blue-600' : 'border-blue-200'
+                          }`}
+                        >
+                          {isChecked && <Check className="h-3 w-3" />}
+                        </span>
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
-            </CardContent>
-          </Card>
+              </ul>
+            )}
 
-          {/* Location & Room Details */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider font-mono">
-                2. Location Information
-              </CardTitle>
-              <CardDescription>Select your campus hostel and room location</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <label className="text-[11px] font-mono text-zinc-400 block mb-1">Campus Hostel</label>
-                <select
-                  value={selectedHostelId}
-                  onChange={(e) => {
-                    const newHostelId = e.target.value;
-                    setSelectedHostelId(newHostelId);
-                    const targetHostel = hostels.find((h) => h.id === newHostelId);
-                    if (targetHostel && targetHostel.blocks.length > 0) {
-                      setStudentBlock(targetHostel.blocks[0]);
-                    }
-                  }}
-                  className="w-full bg-black border border-zinc-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-white"
-                >
-                  {hostels.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.name} ({h.type})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            {/* Step 2: location as underlined fields */}
+            {step === 1 && (
+              <div className="space-y-6">
                 <div>
-                  <label className="text-[11px] font-mono text-zinc-400 block mb-1">Hostel Block / Wing</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Hostel</label>
                   <select
-                    value={studentBlock}
-                    onChange={(e) => setStudentBlock(e.target.value)}
-                    className="w-full bg-black border border-zinc-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-white"
+                    value={selectedHostelId}
+                    onChange={(e) => {
+                      const newHostelId = e.target.value;
+                      setSelectedHostelId(newHostelId);
+                      const targetHostel = hostels.find((h) => h.id === newHostelId);
+                      if (targetHostel && targetHostel.blocks.length > 0) {
+                        setStudentBlock(targetHostel.blocks[0]);
+                      }
+                    }}
+                    className={underlineField}
                   >
-                    {selectedHostel.blocks.map((blk) => (
-                      <option key={blk} value={blk}>
-                        {blk}
+                    {hostels.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name} ({h.type})
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="text-[11px] font-mono text-zinc-400 block mb-1">Room / Floor</label>
-                  <input
-                    type="text"
-                    required
-                    value={roomNumber}
-                    onChange={(e) => setRoomNumber(e.target.value)}
-                    placeholder="e.g. Room 304, 3rd Floor"
-                    className="w-full bg-black border border-zinc-800 rounded-lg p-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white"
-                  />
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-blue-400">
+                      Block / wing
+                    </label>
+                    <select
+                      value={studentBlock}
+                      onChange={(e) => setStudentBlock(e.target.value)}
+                      className={underlineField}
+                    >
+                      {selectedHostel.blocks.map((blk) => (
+                        <option key={blk} value={blk}>
+                          {blk}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-blue-400">
+                      Room / floor
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={roomNumber}
+                      onChange={(e) => setRoomNumber(e.target.value)}
+                      placeholder="Room 304"
+                      className={underlineField}
+                    />
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            )}
 
-          {/* Description Textarea */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider font-mono">
-                3. Description
-              </CardTitle>
-              <CardDescription>Provide any additional context or timeline details</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <textarea
-                rows={4}
-                required
-                placeholder="e.g. Water coming out from bathroom tap had an unusual earthy smell and slight yellow tint starting around 9:30 AM..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white transition-colors"
-              />
-            </CardContent>
-          </Card>
-
-          {/* Submit Button */}
-          <div className="pt-2">
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-6 text-sm font-bold bg-white text-black hover:bg-zinc-200"
-            >
-              {isSubmitting ? 'Dispatching Ticket...' : 'Submit Complaint'}
-            </Button>
+            {/* Step 3: description */}
+            {step === 2 && (
+              <div>
+                <textarea
+                  rows={5}
+                  required
+                  autoFocus
+                  placeholder="The tap water had an earthy smell and a slight yellow tint starting around 9:30 AM…"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className={`${underlineField} resize-none text-base font-medium leading-relaxed`}
+                />
+                <p className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-700">
+                  Reporting <b>{selectedIssues.join(', ')}</b> in <b>{studentBlock}</b>, {roomNumber}.
+                </p>
+              </div>
+            )}
           </div>
-        </form>
-      )}
-    </div>
+        </div>
+      </div>
+
+      {/* Bottom nav */}
+      <div className="mt-8 flex items-center gap-3">
+        {step > 0 && (
+          <button
+            type="button"
+            onClick={() => setStep(step - 1)}
+            aria-label="Back"
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 transition hover:bg-blue-100"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        )}
+
+        {step < lastStep ? (
+          <button
+            type="button"
+            disabled={!canAdvance}
+            onClick={() => setStep(step + 1)}
+            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:bg-blue-200 disabled:shadow-none"
+          >
+            Continue <ArrowRight className="h-4 w-4" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={isSubmitting || !canAdvance}
+            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:bg-blue-200 disabled:shadow-none"
+          >
+            {isSubmitting ? 'Sending…' : 'Send report'} <Send className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </form>
   );
 }

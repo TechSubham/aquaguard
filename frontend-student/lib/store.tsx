@@ -236,8 +236,19 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
           fetchWaterTestsApi(),
           fetchIncidentsApi(),
         ]);
-        if (backendTanks && backendTanks.length > 0) setTanks(backendTanks);
-        if (backendHostels && backendHostels.length > 0) setHostels(backendHostels);
+        if (backendTanks && backendTanks.length > 0) {
+          setTanks(backendTanks);
+          setSelectedTankIdState(backendTanks[0].id);
+          if (backendTanks[0].hostelId) {
+            setSelectedHostelIdState(backendTanks[0].hostelId);
+          }
+        }
+        if (backendHostels && backendHostels.length > 0) {
+          setHostels(backendHostels);
+          if (!backendTanks?.[0]?.hostelId) {
+            setSelectedHostelIdState(backendHostels[0].id);
+          }
+        }
         if (backendAlerts && backendAlerts.length > 0) setAlerts(backendAlerts);
         if (backendComplaints && backendComplaints.length > 0) setComplaints(backendComplaints);
         if (backendWaterTests && backendWaterTests.length > 0) setWaterTests(backendWaterTests);
