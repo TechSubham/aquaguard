@@ -268,8 +268,16 @@ export default function WaterTestingPage() {
 
       {/* Modal: View Report Certificate */}
       {selectedReport && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-700 rounded-xl max-w-xl w-full p-6 space-y-5 text-white">
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedReport(null);
+          }}
+        >
+          <div
+            className="bg-zinc-950 border border-zinc-700 rounded-xl max-w-xl w-full p-6 space-y-5 text-white cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div>
                 <h3 className="text-lg font-bold font-mono">Laboratory Certificate of Analysis</h3>
@@ -320,10 +328,16 @@ export default function WaterTestingPage() {
 
       {/* Modal: Add New Test Form */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsAddModalOpen(false);
+          }}
+        >
           <form
             onSubmit={handleCreateTest}
-            className="bg-zinc-950 border border-zinc-700 rounded-xl max-w-md w-full p-6 space-y-4 text-white"
+            className="bg-zinc-950 border border-zinc-700 rounded-xl max-w-md w-full p-6 space-y-4 text-white cursor-default"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
               <h3 className="text-base font-bold">Log New Laboratory Assay</h3>

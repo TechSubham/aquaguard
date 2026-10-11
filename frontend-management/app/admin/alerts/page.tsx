@@ -187,8 +187,16 @@ export default function AlertsPage() {
 
       {/* Investigation Details Modal */}
       {selectedAlertForModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <Card className="max-w-lg w-full border-slate-700 bg-[#18212D] text-white p-2 shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedAlertForModal(null);
+          }}
+        >
+          <Card
+            className="max-w-lg w-full border-slate-700 bg-[#18212D] text-white p-2 shadow-2xl cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
             <CardHeader>
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono text-slate-400 uppercase">Incident Investigation Dossier</span>

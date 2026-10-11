@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useAquaGuard } from '@/lib/store';
-import { timeAgo, formatClockTime } from '@/lib/utils';
+import { timeAgo, formatClockTime, useClickOutside } from '@/lib/utils';
 import {
   SlidersHorizontal,
   ChevronDown,
@@ -24,12 +24,14 @@ import {
   Layers,
   ShieldCheck,
   TrendingUp,
+  Building2,
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const {
     selectedTank,
     selectedHostel,
+    selectedHostelId,
     hostels,
     setSelectedHostelId,
     tanks,
@@ -49,7 +51,13 @@ export default function AdminDashboardPage() {
   const [selectedTimeframe, setSelectedTimeframe] = useState<'24h' | '7d' | '30d'>('24h');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [accountsExpanded, setAccountsExpanded] = useState(true);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+  useClickOutside(filterDropdownRef, () => setShowFilterDropdown(false), showFilterDropdown);
+
+  const hostelTanks = tanks.filter(
+    (t) => t.hostelId === selectedHostelId || t.hostel === selectedHostel.name
+  );
 
   const latestReadingLabel = currentReading.recorded_at
     ? timeAgo(currentReading.recorded_at)
@@ -59,69 +67,78 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-200">
-      {/* 1. Header Greeting & Primary Action Pill (Matching Reference UI) */}
+      {/* 1. Header Greeting (Matching Reference UI) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
         <div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#0B1B22]">
             Good morning, Ranjeet!
           </h1>
-          {/* <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
-            Campus water facilities operational • All IoT nodes reporting nominal flow
-          </p> */}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link href="/admin/water-tests">
-            <button className="rounded-full bg-[#0B1B22] hover:bg-black text-white font-semibold text-xs sm:text-sm px-5 py-2.5 shadow-sm transition-all flex items-center gap-2 group cursor-pointer">
-              <Plus className="h-4 w-4 transition-transform group-hover:rotate-90" />
-              <span>New water sample test</span>
-            </button>
-          </Link>
         </div>
       </div>
 
       {/* 2. Secondary Filter & Action Toolbar (Matching Reference UI) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-        {/* Left Pills: Filter, Dropdown, Export */}
+        {/* Left Pills: Facility & Tank Selector, Live Stream Toggle */}
         <div className="flex items-center flex-wrap gap-2.5">
-          {/* <button
-            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-            className="flex items-center gap-2 rounded-full bg-white border border-slate-200/90 px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm transition-all cursor-pointer"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
-            <span>Filter</span>
-          </button> */}
-
-          <div className="relative">
+          {/* Hostel and Tank Selection */}
+          <div ref={filterDropdownRef} className="relative">
             <button
               onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-              className="flex items-center gap-2 rounded-full bg-white border border-slate-200/90 px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm transition-all cursor-pointer"
+              className="flex items-center gap-2 px-3 py-2 rounded-full bg-white border border-slate-200/90 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm transition-all cursor-pointer"
             >
-              <span>{selectedHostel.code}: {selectedTank.code}</span>
+              <Building2 className="h-3.5 w-3.5 text-[#0284C7]" />
+              <span className="text-slate-400 font-normal">{selectedHostel.code}:</span>
+              <span className="text-slate-900 font-semibold">{selectedTank.code}</span>
               <ChevronDown className="h-3 w-3 text-slate-400" />
             </button>
 
             {showFilterDropdown && (
-              <div className="absolute left-0 top-full mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl z-30 animate-in fade-in zoom-in-95">
-                <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1.5">
-                  Filter by Facility & Tank
+              <div className="absolute left-0 top-full mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xl z-30 animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-2 py-1.5 border-b border-slate-100 mb-1.5">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">
+                    Select Campus Facility
+                  </div>
+                  <select
+                    value={selectedHostelId}
+                    onChange={(e) => setSelectedHostelId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-900 rounded-lg p-1.5 font-medium focus:outline-none focus:border-[#0284C7]"
+                  >
+                    {hostels.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                  {tanks.map((t) => (
+
+                <div className="text-[10px] text-slate-400 px-2 py-1 uppercase tracking-wider font-bold">
+                  Active Tanks in {selectedHostel.name.split(' (')[0]}
+                </div>
+                <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+                  {hostelTanks.map((t) => (
                     <button
                       key={t.id}
                       onClick={() => {
                         setSelectedTankId(t.id);
                         setShowFilterDropdown(false);
                       }}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs font-medium transition-colors ${
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                         t.id === selectedTank.id
-                          ? 'bg-[#0284C7]/10 text-[#0284C7] font-bold'
-                          : 'text-slate-700 hover:bg-slate-50'
+                          ? 'bg-slate-100 text-slate-900 font-bold'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
-                      <span>{t.name} ({t.block})</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{t.waterLevelPercent}%</span>
+                      <div>
+                        <div className="text-slate-900 font-medium">{t.name}</div>
+                        <div className="text-[10px] text-slate-500">
+                          {t.block} • {t.capacityLiters.toLocaleString()} L
+                        </div>
+                      </div>
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          t.riskStatus === 'CRITICAL' ? 'bg-red-500' : 'bg-emerald-500'
+                        }`}
+                      />
                     </button>
                   ))}
                 </div>

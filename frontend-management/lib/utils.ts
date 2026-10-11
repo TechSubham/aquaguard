@@ -43,3 +43,36 @@ export function timeAgo(dateString: string): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   return `${Math.floor(diffHours / 24)}d ago`;
 }
+
+export function useClickOutside(
+  ref: React.RefObject<HTMLElement | null>,
+  handler: () => void,
+  active: boolean = true
+) {
+  useEffect(() => {
+    if (!active) return;
+
+    function handlePointerDown(event: PointerEvent | MouseEvent | TouchEvent) {
+      const el = ref.current;
+      if (!el || el.contains(event.target as Node)) {
+        return;
+      }
+      handler();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        handler();
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [ref, handler, active]);
+}
+
