@@ -24,6 +24,28 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+type BackendTank = {
+  tank_code: string;
+  hostel_id?: number | string | null;
+  block_name?: string | null;
+  hostel_name?: string | null;
+  capacity_liters?: number | string | null;
+};
+
+type TankStatusResponse = {
+  sensor_online?: boolean;
+  water_level?: number | string | null;
+  risk_score?: number | string | null;
+  last_reading?: string | null;
+};
+
+function riskStatusFromScore(score: number): Tank['riskStatus'] {
+  if (score >= 80) return 'CRITICAL';
+  if (score >= 50) return 'HIGH';
+  if (score >= 30) return 'ELEVATED';
+  return 'NORMAL';
+}
+
 // ----------------------------------------------------
 // 1. Telemetry Readings
 // ----------------------------------------------------
@@ -35,18 +57,20 @@ export async function fetchLatestReading(tankCode: string): Promise<SensorReadin
     });
     if (res.ok) {
       const data = await res.json();
-      return {
-        tank_id: data.tank_id || tankCode,
-        recorded_at: data.recorded_at || new Date().toISOString(),
-        temperature: Number(data.temperature ?? 26.29),
-        ph: Number(data.ph ?? 6.39),
-        tds: Number(data.tds ?? 486),
-        turbidity: Number(data.turbidity ?? 6.88),
-        water_level: Number(data.water_level ?? 79.9),
-        flow_rate: Number(data.flow_rate ?? 3.5),
-        risk_score: Number(data.risk_score ?? 90),
-        ai_risk_probability: Number(data.ai_risk_probability ?? 0.84),
-      };
+      if (data.has_data !== false) {
+        return {
+          tank_id: data.tank_id || tankCode,
+          recorded_at: data.recorded_at || new Date().toISOString(),
+          temperature: Number(data.temperature ?? 26.29),
+          ph: Number(data.ph ?? 6.39),
+          tds: Number(data.tds ?? 486),
+          turbidity: Number(data.turbidity ?? 6.88),
+          water_level: Number(data.water_level ?? 79.9),
+          flow_rate: Number(data.flow_rate ?? 3.5),
+          risk_score: Number(data.risk_score ?? 90),
+          ai_risk_probability: Number(data.ai_risk_probability ?? 0.84),
+        };
+      }
     }
   } catch {
     // Offline fallback
@@ -113,28 +137,31 @@ export async function fetchTanks(): Promise<Tank[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        return data.map((t: any) => {
+        return Promise.all((data as BackendTank[]).map(async (t) => {
           const matchMock = INITIAL_TANKS.find((m) => m.code === t.tank_code || m.id === t.tank_code);
+          const status = await fetchTankStatus(t.tank_code);
+          const riskScore = Number(status?.risk_score ?? matchMock?.riskScore ?? 18);
+          const lastReading = status?.last_reading ? new Date(status.last_reading) : null;
           return {
             id: t.tank_code,
             code: t.tank_code,
             name: matchMock?.name ?? `${t.block_name || 'Block A'} Main Header`,
-            hostelId: matchMock?.hostelId ?? 'hostel-ramanujan',
-            hostel: matchMock?.hostel ?? t.hostel_name ?? 'Ramanujan Hostel (Boys Hostel 1)',
+            hostelId: t.hostel_id ? `hostel-${t.hostel_id}` : matchMock?.hostelId ?? 'hostel-ramanujan',
+            hostel: t.hostel_name ?? matchMock?.hostel ?? 'Ramanujan Hostel (Boys Hostel 1)',
             block: t.block_name || matchMock?.block || 'Block A',
             capacityLiters: Number(t.capacity_liters || matchMock?.capacityLiters || 10000),
-            waterLevelPercent: matchMock?.waterLevelPercent ?? 79.9,
-            sensorStatus: matchMock?.sensorStatus ?? 'ONLINE',
-            riskStatus: matchMock?.riskStatus ?? 'NORMAL',
-            riskScore: matchMock?.riskScore ?? 18,
-            lastUpdated: 'Just now',
+            waterLevelPercent: Number(status?.water_level ?? matchMock?.waterLevelPercent ?? 79.9),
+            sensorStatus: status?.sensor_online === false ? 'OFFLINE' : 'ONLINE',
+            riskStatus: riskStatusFromScore(riskScore),
+            riskScore,
+            lastUpdated: lastReading ? lastReading.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No readings',
             lastServiceDate: matchMock?.lastServiceDate ?? '12 Sep 2026',
             nextServiceDate: matchMock?.nextServiceDate ?? '12 Oct 2026',
             maintenanceStatus: matchMock?.maintenanceStatus ?? 'GOOD',
             maintenanceType: matchMock?.maintenanceType ?? 'Standard Inspection',
             aiMaintenanceRisk: matchMock?.aiMaintenanceRisk ?? 25,
           };
-        });
+        }));
       }
     }
   } catch {
@@ -153,15 +180,15 @@ export async function fetchHostelsApi(): Promise<Hostel[]> {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         return data.map((h: any) => {
-          const matchMock = INITIAL_HOSTELS.find((m) => m.name.toLowerCase().includes(h.name.toLowerCase()));
+          const matchMock = INITIAL_HOSTELS.find((m) => m.name.toLowerCase() === h.name.toLowerCase());
           return {
-            id: matchMock?.id ?? `hostel-${h.id}`,
+            id: `hostel-${h.id}`,
             code: matchMock?.code ?? `H-${h.id}`,
             name: h.name,
             campus: h.location || matchMock?.campus || 'NSUT Main Campus',
             type: (matchMock?.type ?? ((h.name.toLowerCase().includes('girl') || h.name.toLowerCase().includes('sarojini') || h.name.toLowerCase().includes('kalpana')) ? 'GIRLS' : 'BOYS')),
             blocks: h.blocks?.map((b: any) => b.name) || matchMock?.blocks || ['Block A'],
-            totalTanks: matchMock?.totalTanks ?? 2,
+            totalTanks: matchMock?.totalTanks ?? 1,
           };
         });
       }
@@ -172,7 +199,7 @@ export async function fetchHostelsApi(): Promise<Hostel[]> {
   return INITIAL_HOSTELS;
 }
 
-export async function fetchTankStatus(tankCode: string): Promise<any> {
+export async function fetchTankStatus(tankCode: string): Promise<TankStatusResponse | null> {
   try {
     const res = await fetch(`${API_BASE}/tanks/${tankCode}/status`, {
       cache: 'no-store',
@@ -238,9 +265,13 @@ export async function updateAlertStatusApi(alertIdNum: number, status: string): 
 // ----------------------------------------------------
 export async function fetchComplaintsApi(): Promise<Complaint[]> {
   try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('aquaguard_token') : '';
     const res = await fetch(`${API_BASE}/complaints`, {
       cache: 'no-store',
-      headers: { 'Accept': 'application/json' },
+      headers: { 
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
     });
     if (res.ok) {
       const data = await res.json();
@@ -268,9 +299,13 @@ export async function fetchComplaintsApi(): Promise<Complaint[]> {
 
 export async function createComplaintApi(payload: { tank_code?: string; category: string; description: string }): Promise<boolean> {
   try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('aquaguard_token') : '';
     const res = await fetch(`${API_BASE}/complaints`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(payload),
     });
     return res.ok;
@@ -281,9 +316,13 @@ export async function createComplaintApi(payload: { tank_code?: string; category
 
 export async function updateComplaintStatusApi(complaintId: number, status: string, adminNotes?: string): Promise<boolean> {
   try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('aquaguard_token') : '';
     const res = await fetch(`${API_BASE}/complaints/${complaintId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ status, admin_notes: adminNotes }),
     });
     return res.ok;
@@ -416,18 +455,46 @@ export async function loginUserApi(email: string, password: string): Promise<any
     if (res.ok) {
       return await res.json();
     }
-  } catch {
-    // Offline fallback
+    const err = await res.json();
+    throw new Error(err.detail || 'Login failed');
+  } catch (error) {
+    throw error;
   }
-  return null;
+}
+
+export async function registerUserApi(payload: { name: string; email: string; password: string; role: string }): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    const err = await res.json();
+    throw new Error(err.detail || 'Registration failed');
+  } catch (error) {
+    throw error;
+  }
 }
 
 // ----------------------------------------------------
 // 9. AI Prediction & Intelligence API
 // ----------------------------------------------------
 function mapBackendAIPrediction(data: any): AIPredictionData {
+  if (data.status === 'offline') {
+    return {
+      status: 'offline',
+      message: data.message || 'Sensors are offline.',
+      tankId: data.tank_id || '',
+      currentRiskPercent: 0,
+      riskLevel: 'LOW',
+    } as AIPredictionData;
+  }
   const trajectory = data.trajectory || {};
   return {
+    status: 'online',
     tankId: data.tank_id || 'A2-ROOF-01',
     currentRiskPercent: Number(trajectory.current ?? data.risk_score ?? 84),
     riskLevel: data.severity || (data.risk_score > 70 ? 'HIGH' : data.risk_score > 40 ? 'MODERATE' : 'LOW'),

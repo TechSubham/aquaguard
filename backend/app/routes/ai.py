@@ -74,7 +74,14 @@ def _sync_predictive_alerts(db: Session, tank: Tank, prediction: Dict[str, Any])
 
             try:
                 from app.services.email_service import broadcast_severity_alert
-                broadcast_severity_alert(db, tank.tank_code, new_alert.severity, title, msg)
+                broadcast_severity_alert(
+                    db,
+                    tank.tank_code,
+                    new_alert.severity,
+                    title,
+                    msg,
+                    roles=("student", "admin")
+                )
             except Exception as e:
                 print(f"Error triggering email broadcast: {e}")
         else:
@@ -105,11 +112,19 @@ def _sync_predictive_alerts(db: Session, tank: Tank, prediction: Dict[str, Any])
                 ai_probability=prediction.get("anomaly_details", {}).get("anomaly_probability"),
                 status="OPEN"
             )
+            db.add(new_ano_alert)
             db.commit()
             
             try:
                 from app.services.email_service import broadcast_severity_alert
-                broadcast_severity_alert(db, tank.tank_code, new_ano_alert.severity, new_ano_alert.title, new_ano_alert.message)
+                broadcast_severity_alert(
+                    db,
+                    tank.tank_code,
+                    new_ano_alert.severity,
+                    new_ano_alert.title,
+                    new_ano_alert.message,
+                    roles=("student", "admin")
+                )
             except Exception as e:
                 print(f"Error triggering anomaly email broadcast: {e}")
 
@@ -168,134 +183,6 @@ def get_known_tank_profile(tank_code: str) -> Dict[str, Any]:
                 {"id": 102, "complaint_type": "Turbid / Yellowish Color", "description": "Slight yellowish silt visible in drinking cooler", "created_at": "2026-10-08T14:45:00Z"}
             ],
             "maintenance": {"id": 1, "maintenance_type": "UV & Carbon Filter Service", "scheduled_date": "2026-09-01", "completed_date": "2026-08-20", "status": "OVERDUE"}
-        },
-        "B1-ROOF-01": {
-            # Moderate upward drift over 24 hours
-            "series": [
-                (7.18, 295.0, 0.98, 24.4, 78.0, 4.0),
-                (7.17, 298.0, 1.02, 24.4, 77.8, 4.0),
-                (7.16, 301.0, 1.06, 24.5, 77.5, 3.9),
-                (7.15, 304.0, 1.10, 24.5, 77.2, 3.9),
-                (7.14, 308.0, 1.14, 24.6, 76.9, 3.9),
-                (7.13, 312.0, 1.18, 24.6, 76.6, 3.9),
-                (7.12, 316.0, 1.23, 24.7, 76.3, 3.9),
-                (7.10, 320.0, 1.29, 24.7, 76.0, 3.8),
-                (7.08, 324.0, 1.35, 24.8, 75.6, 3.8),
-                (7.07, 328.0, 1.42, 24.8, 75.3, 3.8),
-                (7.05, 332.0, 1.49, 24.9, 75.0, 3.8),
-                (7.03, 336.0, 1.57, 24.9, 74.6, 3.8),
-                (7.01, 340.0, 1.66, 25.0, 74.3, 3.8),
-                (6.99, 344.0, 1.74, 25.0, 74.0, 3.8),
-                (6.97, 348.0, 1.82, 25.0, 73.6, 3.8),
-                (6.95, 351.0, 1.90, 25.1, 73.3, 3.8),
-                (6.93, 354.0, 1.98, 25.1, 73.0, 3.8),
-                (6.92, 357.0, 2.06, 25.1, 72.8, 3.8),
-                (6.90, 359.0, 2.14, 25.1, 72.6, 3.8),
-                (6.89, 361.0, 2.21, 25.2, 72.4, 3.8),
-                (6.88, 362.0, 2.27, 25.2, 72.3, 3.8),
-                (6.87, 363.0, 2.32, 25.2, 72.2, 3.8),
-                (6.86, 364.0, 2.36, 25.2, 72.1, 3.8),
-                (6.85, 365.0, 2.39, 25.2, 72.0, 3.8),
-                (6.85, 365.0, 2.40, 25.2, 72.0, 3.8),
-            ],
-            "complaints": [],
-            "maintenance": {"id": 2, "maintenance_type": "Quarterly Flush", "scheduled_date": "2026-10-15", "completed_date": "2026-09-10", "status": "PENDING"}
-        },
-        "C2-ROOF-01": {
-            # Stable, pristine nominal water throughout all 24 hours
-            "series": [
-                (7.22, 218.0, 0.78, 24.3, 85.5, 4.0),
-                (7.21, 219.0, 0.79, 24.3, 85.4, 4.0),
-                (7.23, 217.0, 0.81, 24.4, 85.6, 4.0),
-                (7.22, 220.0, 0.80, 24.4, 85.5, 4.0),
-                (7.20, 221.0, 0.82, 24.4, 85.2, 4.0),
-                (7.19, 219.0, 0.80, 24.4, 85.0, 4.0),
-                (7.21, 218.0, 0.79, 24.5, 85.2, 4.0),
-                (7.22, 220.0, 0.81, 24.5, 85.3, 4.0),
-                (7.24, 217.0, 0.78, 24.5, 85.6, 4.0),
-                (7.23, 219.0, 0.80, 24.5, 85.4, 4.0),
-                (7.21, 220.0, 0.82, 24.5, 85.1, 4.0),
-                (7.20, 222.0, 0.83, 24.5, 85.0, 4.0),
-                (7.19, 221.0, 0.81, 24.5, 84.8, 4.0),
-                (7.21, 219.0, 0.79, 24.5, 85.0, 4.0),
-                (7.22, 218.0, 0.80, 24.5, 85.2, 4.0),
-                (7.23, 220.0, 0.82, 24.5, 85.3, 4.0),
-                (7.21, 221.0, 0.84, 24.5, 85.1, 4.0),
-                (7.20, 219.0, 0.82, 24.5, 85.0, 4.0),
-                (7.19, 220.0, 0.81, 24.5, 84.9, 4.0),
-                (7.21, 218.0, 0.80, 24.5, 85.1, 4.0),
-                (7.22, 221.0, 0.82, 24.5, 85.2, 4.0),
-                (7.21, 219.0, 0.81, 24.5, 85.1, 4.0),
-                (7.20, 220.0, 0.83, 24.5, 85.0, 4.0),
-                (7.21, 219.0, 0.84, 24.5, 85.0, 4.0),
-                (7.20, 220.0, 0.85, 24.5, 85.0, 4.0),
-            ],
-            "complaints": [],
-            "maintenance": {"id": 3, "maintenance_type": "Sediment Inspection", "scheduled_date": "2026-11-01", "completed_date": "2026-09-28", "status": "GOOD"}
-        },
-        "ARY-A1-ROOF": {
-            # Pristine water in Aryabhatta Hostel
-            "series": [
-                (7.32, 206.0, 0.72, 24.1, 84.5, 4.2),
-                (7.31, 207.0, 0.73, 24.1, 84.4, 4.2),
-                (7.33, 205.0, 0.71, 24.2, 84.6, 4.2),
-                (7.30, 208.0, 0.74, 24.2, 84.3, 4.2),
-                (7.29, 210.0, 0.76, 24.2, 84.1, 4.2),
-                (7.31, 208.0, 0.73, 24.2, 84.3, 4.2),
-                (7.32, 207.0, 0.72, 24.2, 84.5, 4.2),
-                (7.30, 209.0, 0.74, 24.2, 84.3, 4.2),
-                (7.29, 211.0, 0.75, 24.2, 84.1, 4.2),
-                (7.31, 208.0, 0.73, 24.2, 84.3, 4.2),
-                (7.32, 207.0, 0.72, 24.2, 84.4, 4.2),
-                (7.30, 210.0, 0.74, 24.2, 84.2, 4.2),
-                (7.29, 211.0, 0.75, 24.2, 84.1, 4.2),
-                (7.31, 209.0, 0.73, 24.2, 84.3, 4.2),
-                (7.32, 208.0, 0.72, 24.2, 84.4, 4.2),
-                (7.30, 210.0, 0.74, 24.2, 84.2, 4.2),
-                (7.31, 209.0, 0.73, 24.2, 84.3, 4.2),
-                (7.32, 208.0, 0.72, 24.2, 84.4, 4.2),
-                (7.30, 210.0, 0.74, 24.2, 84.2, 4.2),
-                (7.31, 209.0, 0.73, 24.2, 84.3, 4.2),
-                (7.32, 208.0, 0.72, 24.2, 84.4, 4.2),
-                (7.31, 209.0, 0.73, 24.2, 84.3, 4.2),
-                (7.30, 210.0, 0.74, 24.2, 84.2, 4.2),
-                (7.31, 209.0, 0.74, 24.2, 84.2, 4.2),
-                (7.30, 210.0, 0.75, 24.2, 84.2, 4.2),
-            ],
-            "complaints": [],
-            "maintenance": None
-        },
-        "ARY-B1-ROOF": {
-            # Moderate gradual deterioration in Aryabhatta Hostel
-            "series": [
-                (7.12, 318.0, 1.15, 24.6, 76.0, 3.5),
-                (7.10, 322.0, 1.22, 24.7, 75.6, 3.5),
-                (7.08, 327.0, 1.30, 24.7, 75.2, 3.4),
-                (7.06, 332.0, 1.38, 24.8, 74.8, 3.4),
-                (7.04, 338.0, 1.48, 24.9, 74.4, 3.4),
-                (7.01, 344.0, 1.58, 24.9, 74.0, 3.3),
-                (6.98, 350.0, 1.69, 25.0, 73.5, 3.3),
-                (6.95, 357.0, 1.82, 25.1, 73.0, 3.3),
-                (6.92, 364.0, 1.96, 25.2, 72.5, 3.2),
-                (6.89, 371.0, 2.12, 25.3, 72.0, 3.2),
-                (6.86, 378.0, 2.28, 25.4, 71.5, 3.1),
-                (6.83, 384.0, 2.45, 25.5, 71.0, 3.1),
-                (6.80, 390.0, 2.62, 25.5, 70.5, 3.0),
-                (6.78, 395.0, 2.78, 25.6, 70.0, 3.0),
-                (6.76, 399.0, 2.92, 25.6, 69.6, 2.9),
-                (6.74, 403.0, 3.05, 25.7, 69.2, 2.9),
-                (6.73, 405.0, 3.15, 25.7, 68.9, 2.9),
-                (6.72, 407.0, 3.22, 25.7, 68.6, 2.8),
-                (6.71, 408.0, 3.28, 25.7, 68.4, 2.8),
-                (6.71, 409.0, 3.32, 25.8, 68.3, 2.8),
-                (6.70, 409.5, 3.35, 25.8, 68.2, 2.8),
-                (6.70, 410.0, 3.37, 25.8, 68.1, 2.8),
-                (6.70, 410.0, 3.38, 25.8, 68.0, 2.8),
-                (6.70, 410.0, 3.39, 25.8, 68.0, 2.8),
-                (6.70, 410.0, 3.40, 25.8, 68.0, 2.8),
-            ],
-            "complaints": [{"id": 103, "complaint_type": "Low Pressure / Murky", "description": "Wing B tap water looks hazy", "created_at": "2026-10-08T13:00:00Z"}],
-            "maintenance": {"id": 4, "maintenance_type": "Filter Replacement", "scheduled_date": "2026-10-05", "completed_date": None, "status": "OVERDUE"}
         }
     }
 
@@ -335,7 +222,7 @@ class _DynamicKnownTankProfiles(dict):
         return get_known_tank_profile(key)
 
     def __contains__(self, key):
-        return key in ["A2-ROOF-01", "B1-ROOF-01", "C2-ROOF-01", "ARY-A1-ROOF", "ARY-B1-ROOF"]
+        return key == "A2-ROOF-01"
 
 KNOWN_TANK_PROFILES = _DynamicKnownTankProfiles()
 
@@ -520,10 +407,6 @@ def get_fleet_predictions(
     if not tank_list:
         tank_list = [
             ("A2-ROOF-01", "Ramanujan Hostel / Block A / Tank A2"),
-            ("B1-ROOF-01", "Ramanujan Hostel / Block B / Tank B1"),
-            ("C2-ROOF-01", "Ramanujan Hostel / Block C / Tank C2"),
-            ("ARY-B1-ROOF", "Aryabhatta Hostel / Block B / Tank B1"),
-            ("ARY-A1-ROOF", "Aryabhatta Hostel / Block A / Tank A1"),
         ]
 
     for tank_code, tank_display in tank_list:

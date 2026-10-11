@@ -20,12 +20,13 @@ import {
 } from 'lucide-react';
 
 export default function ReportsPage() {
-  const { tanks, selectedTank, alerts, waterTests, complaints, incident } = useAquaGuard();
+  const { tanks, selectedTank, hostels, alerts, waterTests, complaints, incident } = useAquaGuard();
 
-  const [selectedHostel, setSelectedHostel] = useState('NSUT Campus');
+  const [selectedHostel, setSelectedHostel] = useState(hostels[0]?.name ?? 'Ramanujan Hostel (Boys Hostel 1)');
   const [selectedBlock, setSelectedBlock] = useState('Block A');
   const [selectedTankCode, setSelectedTankCode] = useState(selectedTank.code);
   const [reportPeriod, setReportPeriod] = useState('01 Oct 2026 – 07 Oct 2026');
+  const reportBlocks = Array.from(new Set(hostels.flatMap((hostel) => hostel.blocks)));
 
   // Aggregated Report Metrics matching user prompt section 13
   const reportMetrics = {
@@ -97,9 +98,11 @@ export default function ReportsPage() {
             onChange={(e) => setSelectedHostel(e.target.value)}
             className="w-full bg-black border border-zinc-800 rounded p-2 text-white"
           >
-            <option value="NSUT Campus">NSUT Campus</option>
-            <option value="Hostel Boys A">Hostel Boys A</option>
-            <option value="Hostel Girls B">Hostel Girls B</option>
+            {hostels.map((hostel) => (
+              <option key={hostel.id} value={hostel.name}>
+                {hostel.name}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -110,9 +113,11 @@ export default function ReportsPage() {
             onChange={(e) => setSelectedBlock(e.target.value)}
             className="w-full bg-black border border-zinc-800 rounded p-2 text-white"
           >
-            <option value="Block A">Block A</option>
-            <option value="Block B">Block B</option>
-            <option value="Block C">Block C</option>
+            {reportBlocks.map((block) => (
+              <option key={block} value={block}>
+                {block}
+              </option>
+            ))}
           </select>
         </div>
 

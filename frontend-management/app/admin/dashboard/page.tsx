@@ -232,7 +232,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
-                  <span>CAPACITY: 10,000 L</span>
+                  <span>CAPACITY: {selectedTank.capacityLiters.toLocaleString()} L</span>
                   <span className="font-semibold text-slate-700">{selectedTank.block}</span>
                 </div>
               </div>

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AquaGuardProvider } from "@/lib/store";
 import { Navbar } from "@/components/shared/Navbar";
+
+const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "AquaGuard — Autonomous Water Quality & Tank Intelligence",
@@ -15,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full bg-[#F3F4F6] text-[#0B1B22] antialiased">
-      <body className="min-h-full flex flex-col bg-[#F3F4F6] text-[#0B1B22]">
+      <body className={`${plusJakartaSans.className} min-h-full flex flex-col bg-[#F3F4F6] text-[#0B1B22]`}>
         <AquaGuardProvider>
           <Navbar />
           <div className="flex-1 flex flex-col">{children}</div>

@@ -80,15 +80,39 @@ interface AquaGuardContextType {
 
 const AquaGuardContext = createContext<AquaGuardContextType | undefined>(undefined);
 
+const STUDENT_SESSION_STORAGE_KEY = 'aquaguard_student_session';
+
+const DEFAULT_STUDENT_SESSION: UserSession = {
+  role: 'STUDENT',
+  name: 'Rohan Sharma',
+  email: 'rohan.sharma.ug23@nsut.ac.in',
+  block: 'Block A',
+  room: 'Room 214, Block A',
+};
+
+function getInitialStudentSession(): UserSession {
+  if (typeof window === 'undefined') {
+    return DEFAULT_STUDENT_SESSION;
+  }
+
+  const savedSession = localStorage.getItem(STUDENT_SESSION_STORAGE_KEY);
+  if (!savedSession) {
+    return DEFAULT_STUDENT_SESSION;
+  }
+
+  try {
+    const parsedSession = JSON.parse(savedSession) as UserSession;
+    return parsedSession.role === 'STUDENT' ? parsedSession : DEFAULT_STUDENT_SESSION;
+  } catch (err) {
+    console.warn('Failed to restore student session:', err);
+    localStorage.removeItem(STUDENT_SESSION_STORAGE_KEY);
+    return DEFAULT_STUDENT_SESSION;
+  }
+}
+
 export function AquaGuardProvider({ children }: { children: ReactNode }) {
-  const [role, setRoleState] = useState<Role>('ADMIN');
-  const [session, setSession] = useState<UserSession>({
-    role: 'ADMIN',
-    name: 'Chief Facilities Officer',
-    email: 'admin.aquaguard@nsut.ac.in',
-    block: 'Facilities HQ',
-    room: 'Admin Suite 101',
-  });
+  const [role, setRoleState] = useState<Role>('STUDENT');
+  const [sessionState, setSessionState] = useState<UserSession>(getInitialStudentSession);
 
   const [hostels, setHostels] = useState<Hostel[]>(INITIAL_HOSTELS);
   const [selectedHostelId, setSelectedHostelIdState] = useState<string>('hostel-ramanujan');
@@ -127,26 +151,19 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
     }
   }, [tanks]);
 
-  const setRole = useCallback((newRole: Role) => {
-    setRoleState(newRole);
-    if (newRole === 'ADMIN') {
-      setSession({
-        role: 'ADMIN',
-        name: 'Chief Facilities Officer',
-        email: 'admin.aquaguard@nsut.ac.in',
-        block: 'Facilities HQ',
-        room: 'Admin Suite 101',
-      });
-    } else {
-      setSession({
-        role: 'STUDENT',
-        name: 'Rohan Sharma',
-        email: 'rohan.sharma.ug23@nsut.ac.in',
-        block: 'Block A',
-        room: 'Room 214, Block A',
-      });
+  const setSession = useCallback((newSession: UserSession) => {
+    setSessionState(newSession);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STUDENT_SESSION_STORAGE_KEY, JSON.stringify(newSession));
     }
   }, []);
+
+  const setRole = useCallback((newRole: Role) => {
+    setRoleState(newRole);
+    if (newRole === 'STUDENT') {
+      setSession(DEFAULT_STUDENT_SESSION);
+    }
+  }, [setSession]);
 
   const refreshData = useCallback(async () => {
     try {
@@ -355,7 +372,7 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
               ...item,
               timestamp: 'Just now',
               note: note || item.note,
-              actor: session.name,
+              actor: sessionState.name,
             }
           : item
       ),
@@ -369,7 +386,7 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
       value={{
         role,
         setRole,
-        session,
+        session: sessionState,
         setSession,
         hostels,
         selectedHostelId,

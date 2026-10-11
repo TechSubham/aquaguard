@@ -24,8 +24,14 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+function getAdminToken(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem('aquaguard_admin_token') || localStorage.getItem('aquaguard_token') || '';
+}
+
 type BackendTank = {
   tank_code: string;
+  hostel_id?: number | string | null;
   block_name?: string | null;
   hostel_name?: string | null;
   capacity_liters?: number | string | null;
@@ -145,8 +151,8 @@ export async function fetchTanks(): Promise<Tank[]> {
             id: t.tank_code,
             code: t.tank_code,
             name: matchMock?.name ?? `${t.block_name || 'Block A'} Main Header`,
-            hostelId: matchMock?.hostelId ?? 'hostel-ramanujan',
-            hostel: matchMock?.hostel ?? t.hostel_name ?? 'Ramanujan Hostel (Boys Hostel 1)',
+            hostelId: t.hostel_id ? `hostel-${t.hostel_id}` : matchMock?.hostelId ?? 'hostel-ramanujan',
+            hostel: t.hostel_name ?? matchMock?.hostel ?? 'Ramanujan Hostel (Boys Hostel 1)',
             block: t.block_name || matchMock?.block || 'Block A',
             capacityLiters: Number(t.capacity_liters || matchMock?.capacityLiters || 10000),
             waterLevelPercent: Number(status?.water_level ?? matchMock?.waterLevelPercent ?? 79.9),
@@ -179,15 +185,15 @@ export async function fetchHostelsApi(): Promise<Hostel[]> {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         return data.map((h: any) => {
-          const matchMock = INITIAL_HOSTELS.find((m) => m.name.toLowerCase().includes(h.name.toLowerCase()));
+          const matchMock = INITIAL_HOSTELS.find((m) => m.name.toLowerCase() === h.name.toLowerCase());
           return {
-            id: matchMock?.id ?? `hostel-${h.id}`,
+            id: `hostel-${h.id}`,
             code: matchMock?.code ?? `H-${h.id}`,
             name: h.name,
             campus: h.location || matchMock?.campus || 'NSUT Main Campus',
             type: (matchMock?.type ?? ((h.name.toLowerCase().includes('girl') || h.name.toLowerCase().includes('sarojini') || h.name.toLowerCase().includes('kalpana')) ? 'GIRLS' : 'BOYS')),
             blocks: h.blocks?.map((b: any) => b.name) || matchMock?.blocks || ['Block A'],
-            totalTanks: matchMock?.totalTanks ?? 2,
+            totalTanks: matchMock?.totalTanks ?? 1,
           };
         });
       }
@@ -264,7 +270,7 @@ export async function updateAlertStatusApi(alertIdNum: number, status: string): 
 // ----------------------------------------------------
 export async function fetchComplaintsApi(): Promise<Complaint[]> {
   try {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('aquaguard_token') : '';
+    const token = getAdminToken();
     const res = await fetch(`${API_BASE}/complaints`, {
       cache: 'no-store',
       headers: { 
@@ -274,7 +280,7 @@ export async function fetchComplaintsApi(): Promise<Complaint[]> {
     });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data.map((c: any) => ({
           id: c.ticket_code || `#${c.id}`,
           studentName: c.student_name || 'Aarav Patel',
@@ -298,7 +304,7 @@ export async function fetchComplaintsApi(): Promise<Complaint[]> {
 
 export async function createComplaintApi(payload: { tank_code?: string; category: string; description: string }): Promise<boolean> {
   try {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('aquaguard_token') : '';
+    const token = getAdminToken();
     const res = await fetch(`${API_BASE}/complaints`, {
       method: 'POST',
       headers: { 
@@ -315,12 +321,13 @@ export async function createComplaintApi(payload: { tank_code?: string; category
 
 export async function updateComplaintStatusApi(complaintId: number, status: string, adminNotes?: string): Promise<boolean> {
   try {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('aquaguard_token') : '';
+    const token = getAdminToken();
     const res = await fetch(`${API_BASE}/complaints/${complaintId}`, {
       method: 'PATCH',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'X-User-Role': 'admin',
       },
       body: JSON.stringify({ status, admin_notes: adminNotes }),
     });

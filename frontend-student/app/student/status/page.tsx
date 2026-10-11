@@ -30,7 +30,7 @@ function StatusPill({ status }: { status: ParamStatus }) {
       <CheckCircle2 className="h-3 w-3" /> In range
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-semibold">
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-semibold">
       <AlertTriangle className="h-3 w-3" /> Check
     </span>
   );
@@ -77,7 +77,7 @@ function ParamTile({
           <div
             className={`h-full rounded-full ${
               status === 'warn'
-                ? 'bg-gradient-to-r from-amber-400 to-orange-400'
+                ? 'bg-gradient-to-r from-red-500 to-rose-400'
                 : 'bg-gradient-to-r from-blue-500 to-cyan-400'
             }`}
             style={{ width: `${clamp(percent)}%` }}
@@ -116,7 +116,7 @@ export default function StudentWaterStatusPage() {
         className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-xl ${
           isSafe
             ? 'bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-400 shadow-blue-300/50'
-            : 'bg-gradient-to-br from-amber-500 via-orange-400 to-amber-300 shadow-amber-200/60'
+            : 'bg-gradient-to-br from-red-600 via-red-500 to-rose-400 shadow-red-200/60'
         }`}
       >
         {/* decorative bubbles */}
@@ -134,7 +134,7 @@ export default function StudentWaterStatusPage() {
               {isSafe ? (
                 <ShieldCheck className="h-8 w-8" />
               ) : (
-                <AlertTriangle className="h-8 w-8 text-amber-500" />
+                <AlertTriangle className="h-8 w-8 text-red-500" />
               )}
             </div>
             <div>

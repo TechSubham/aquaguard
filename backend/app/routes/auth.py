@@ -93,8 +93,15 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     try:
         send_alert_email(
             to_email=new_user.email,
-            subject="Welcome to AquaGuard NSUT!",
-            message=f"Hi {new_user.name}, your account has been successfully created. You can now monitor campus water quality in real-time."
+            subject="Welcome to AquaGuard NSUT - your account is ready",
+            message=(
+                f"Hi {new_user.name},\n\n"
+                "Your AquaGuard account has been created successfully.\n\n"
+                "What you can do now:\n"
+                "Monitor hostel water quality in real time\n"
+                "View active advisories for your block\n"
+                "Report water issues directly to facilities"
+            )
         )
     except Exception as e:
         print(f"Failed to send welcome email: {e}")

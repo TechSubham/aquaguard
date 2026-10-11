@@ -1,25 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAquaGuard } from '@/lib/store';
-import { formatClockTime, useIsClientMounted } from '@/lib/utils';
 import {
   Bell,
-  Settings,
   Waves,
   Building2,
   ChevronDown,
   LogOut,
-  ExternalLink,
 } from 'lucide-react';
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const {
-    role,
-    setRole,
     session,
     hostels,
     selectedHostelId,
@@ -29,25 +25,55 @@ export function Navbar() {
     tanks,
     setSelectedTankId,
     alerts,
-    isLiveUpdating,
   } = useAquaGuard();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showTankMenu, setShowTankMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const isMounted = useIsClientMounted();
+  const tankMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const unreadAlerts = alerts.filter((a) => a.status !== 'RESOLVED');
   const hostelTanks = tanks.filter((t) => t.hostelId === selectedHostelId || t.hostel === selectedHostel.name);
+  const studentInitials = useMemo(() => {
+    const initials = session.name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('');
+
+    return initials || 'ST';
+  }, [session.name]);
+
+  useEffect(() => {
+    const closeOpenMenus = (event: PointerEvent) => {
+      const target = event.target as Node;
+      const clickedInside =
+        tankMenuRef.current?.contains(target) ||
+        notificationsRef.current?.contains(target) ||
+        userMenuRef.current?.contains(target);
+
+      if (!clickedInside) {
+        setShowTankMenu(false);
+        setShowNotifications(false);
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeOpenMenus);
+    return () => document.removeEventListener('pointerdown', closeOpenMenus);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('aquaguard_token');
-    window.location.href = '/login';
+    localStorage.removeItem('aquaguard_student_session');
+    router.push('/login');
   };
 
   const navItems = [
     { label: 'Dashboard', href: '/student/dashboard' },
-    { label: 'Water Status', href: '/student/status' },
     { label: 'Advisories', href: '/student/alerts', badge: unreadAlerts.length > 0 ? unreadAlerts.length : undefined },
     { label: 'Report Issue', href: '/student/complaints' },
     { label: 'My Complaints', href: '/student/history' },
@@ -76,9 +102,13 @@ export function Navbar() {
           </Link>
 
           {/* Quick Hostel / Block Pill */}
-          <div className="relative hidden xl:block">
+          <div ref={tankMenuRef} className="relative hidden xl:block">
             <button
-              onClick={() => setShowTankMenu(!showTankMenu)}
+              onClick={() => {
+                setShowTankMenu((open) => !open);
+                setShowNotifications(false);
+                setShowUserMenu(false);
+              }}
               className="flex items-center gap-2 px-3 py-2 rounded-full bg-white border border-slate-200/80 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm transition-all"
             >
               <Building2 className="h-3.5 w-3.5 text-[#0284C7]" />
@@ -168,38 +198,16 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* Right: Round Utility Action Icons (Settings, Notification, User Avatar) */}
+        {/* Right: Round Utility Action Icons (Notification, User Avatar) */}
         <div className="flex items-center gap-2.5">
-          {/* Live Telemetry Pulse Dot */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200/80 shadow-sm text-xs font-semibold text-slate-700">
-            <span className="relative flex h-2 w-2">
-              <span
-                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                  isLiveUpdating ? 'bg-emerald-400' : 'bg-slate-300'
-                }`}
-              />
-              <span
-                className={`relative inline-flex rounded-full h-2 w-2 ${
-                  isLiveUpdating ? 'bg-emerald-500' : 'bg-slate-400'
-                }`}
-              />
-            </span>
-            <span className="text-[11px] text-slate-500 font-medium">Safe Potable</span>
-          </div>
-
-          {/* Settings Button */}
-          <Link
-            href="/student/status"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900 hover:border-slate-300 shadow-sm transition-all"
-            title="Water Quality Standards"
-          >
-            <Settings className="h-4 w-4" />
-          </Link>
-
           {/* Notifications Button */}
-          <div className="relative">
+          <div ref={notificationsRef} className="relative">
             <button
-              onClick={() => setShowNotifications(!showNotifications)}
+              onClick={() => {
+                setShowNotifications((open) => !open);
+                setShowTankMenu(false);
+                setShowUserMenu(false);
+              }}
               className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900 hover:border-slate-300 shadow-sm transition-all"
               title="Advisories & Alerts"
             >
@@ -254,13 +262,17 @@ export function Navbar() {
           </div>
 
           {/* User Profile Avatar Pill */}
-          <div className="relative">
+          <div ref={userMenuRef} className="relative">
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
+              onClick={() => {
+                setShowUserMenu((open) => !open);
+                setShowTankMenu(false);
+                setShowNotifications(false);
+              }}
               className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full bg-white border border-slate-200/80 hover:border-slate-300 shadow-sm transition-all"
             >
               <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#0284C7] to-[#38BDF8] flex items-center justify-center text-white font-bold text-xs shadow-inner">
-                RO
+                {studentInitials}
               </div>
               <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
             </button>
@@ -278,17 +290,6 @@ export function Navbar() {
                 </div>
 
                 <div className="p-1 space-y-1">
-                  <button
-                    onClick={() => {
-                      setRole('ADMIN');
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-between"
-                  >
-                    <span>Switch to Admin Command</span>
-                    <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
-                  </button>
-
                   <button
                     onClick={handleLogout}
                     className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2"

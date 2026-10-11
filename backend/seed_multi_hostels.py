@@ -13,127 +13,69 @@ from app.models.incident import Incident
 from app.models.maintenance import Maintenance
 from app.models.user import User
 
+TARGET_HOSTEL = {
+    "name": "Ramanujan Hostel (Boys Hostel 1)",
+    "location": "NSUT Main Campus - North Sector",
+    "block": "Block A",
+    "tank_code": "A2-ROOF-01",
+    "capacity": 10000,
+}
+
+
 def seed_hostels_and_tanks():
     Base.metadata.create_all(bind=engine)
     db: Session = SessionLocal()
 
-    hostels_data = [
-        {
-            "name": "Ramanujan Hostel (Boys Hostel 1)",
-            "location": "NSUT Main Campus - North Sector",
-            "blocks": [
-                {
-                    "name": "Block A",
-                    "tanks": [
-                        {"code": "A2-ROOF-01", "capacity": 10000},
-                        {"code": "A1-GROUND-01", "capacity": 25000},
-                    ]
-                },
-                {
-                    "name": "Block B",
-                    "tanks": [
-                        {"code": "B1-ROOF-01", "capacity": 12000},
-                    ]
-                },
-                {
-                    "name": "Block C",
-                    "tanks": [
-                        {"code": "C2-ROOF-01", "capacity": 8000},
-                    ]
-                },
-            ]
-        },
-        {
-            "name": "Aryabhatta Hostel (Boys Hostel 2)",
-            "location": "NSUT Main Campus - East Sector",
-            "blocks": [
-                {
-                    "name": "Block A",
-                    "tanks": [
-                        {"code": "ARY-A1-ROOF", "capacity": 15000},
-                    ]
-                },
-                {
-                    "name": "Block B",
-                    "tanks": [
-                        {"code": "ARY-B1-ROOF", "capacity": 15000},
-                    ]
-                },
-            ]
-        },
-        {
-            "name": "Kalpana Chawla Hostel (Girls Hostel 1)",
-            "location": "NSUT Main Campus - West Sector",
-            "blocks": [
-                {
-                    "name": "Tower 1",
-                    "tanks": [
-                        {"code": "KC-T1-ROOF", "capacity": 14000},
-                    ]
-                },
-                {
-                    "name": "Tower 2",
-                    "tanks": [
-                        {"code": "KC-T2-ROOF", "capacity": 10000},
-                    ]
-                },
-            ]
-        },
-        {
-            "name": "Sarojini Naidu Hostel (Girls Hostel 2)",
-            "location": "NSUT Main Campus - South Sector",
-            "blocks": [
-                {
-                    "name": "Wing A",
-                    "tanks": [
-                        {"code": "SN-W1-ROOF", "capacity": 9000},
-                    ]
-                },
-                {
-                    "name": "Wing B",
-                    "tanks": [
-                        {"code": "SN-W2-ROOF", "capacity": 8000},
-                    ]
-                },
-            ]
-        },
-    ]
-
     try:
-        for h_info in hostels_data:
-            hostel = db.query(Hostel).filter(Hostel.name == h_info["name"]).first()
-            if not hostel:
-                hostel = Hostel(name=h_info["name"], location=h_info["location"])
-                db.add(hostel)
-                db.flush()
-                print(f"Created hostel: {hostel.name}")
+        db.query(Tank).filter(Tank.tank_code != TARGET_HOSTEL["tank_code"]).delete(synchronize_session=False)
+        db.flush()
 
-            for b_info in h_info["blocks"]:
-                block = db.query(Block).filter(Block.hostel_id == hostel.id, Block.name == b_info["name"]).first()
-                if not block:
-                    block = Block(hostel_id=hostel.id, name=b_info["name"])
-                    db.add(block)
-                    db.flush()
-                    print(f"  Created block: {block.name} under {hostel.name}")
+        db.query(Hostel).filter(Hostel.name != TARGET_HOSTEL["name"]).delete(synchronize_session=False)
+        db.flush()
 
-                for t_info in b_info["tanks"]:
-                    tank = db.query(Tank).filter(Tank.tank_code == t_info["code"]).first()
-                    if not tank:
-                        tank = Tank(
-                            tank_code=t_info["code"],
-                            block_id=block.id,
-                            capacity_liters=t_info["capacity"],
-                            status="active"
-                        )
-                        db.add(tank)
-                        db.flush()
-                        print(f"    Created tank: {tank.tank_code} (Capacity: {t_info['capacity']} L)")
-                    else:
-                        tank.block_id = block.id
-                        tank.capacity_liters = t_info["capacity"]
+        hostel = db.query(Hostel).filter(Hostel.name == TARGET_HOSTEL["name"]).first()
+        if not hostel:
+            hostel = Hostel(name=TARGET_HOSTEL["name"], location=TARGET_HOSTEL["location"])
+            db.add(hostel)
+            db.flush()
+            print(f"Created hostel: {hostel.name}")
+        else:
+            hostel.location = TARGET_HOSTEL["location"]
+
+        db.query(Block).filter(
+            Block.hostel_id == hostel.id,
+            Block.name != TARGET_HOSTEL["block"],
+        ).delete(synchronize_session=False)
+        db.flush()
+
+        block = db.query(Block).filter(
+            Block.hostel_id == hostel.id,
+            Block.name == TARGET_HOSTEL["block"],
+        ).first()
+        if not block:
+            block = Block(hostel_id=hostel.id, name=TARGET_HOSTEL["block"])
+            db.add(block)
+            db.flush()
+            print(f"  Created block: {block.name} under {hostel.name}")
+
+        tank = db.query(Tank).filter(Tank.tank_code == TARGET_HOSTEL["tank_code"]).first()
+        if not tank:
+            tank = Tank(
+                tank_code=TARGET_HOSTEL["tank_code"],
+                block_id=block.id,
+                capacity_liters=TARGET_HOSTEL["capacity"],
+                status="active",
+            )
+            db.add(tank)
+            db.flush()
+            print(f"    Created tank: {tank.tank_code} (Capacity: {TARGET_HOSTEL['capacity']} L)")
+        else:
+            tank.block_id = block.id
+            tank.capacity_liters = TARGET_HOSTEL["capacity"]
+            tank.status = "active"
 
         db.commit()
-        print("Successfully seeded multi-hostel campus fleet!")
+        print("Successfully seeded single-hostel AquaGuard database!")
     except Exception as e:
         db.rollback()
         print(f"Error seeding database: {e}")

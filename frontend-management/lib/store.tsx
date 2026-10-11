@@ -70,11 +70,12 @@ interface AquaGuardContextType {
   setIsLiveUpdating: (val: boolean) => void;
   lastRefreshTime: Date;
   refreshData: () => Promise<void>;
+  refreshComplaints: () => Promise<void>;
   runAIInference: () => Promise<AIPredictionData>;
   resolveAlert: (id: string) => void;
   investigateAlert: (id: string) => void;
   addComplaint: (complaint: Omit<Complaint, 'id' | 'submittedAt' | 'status'>) => void;
-  updateComplaintStatus: (id: string, status: Complaint['status'], adminNotes?: string) => void;
+  updateComplaintStatus: (id: string, status: Complaint['status'], adminNotes?: string) => Promise<boolean>;
   addWaterTest: (test: Omit<WaterTestReport, 'id' | 'reportNumber'>) => void;
   markMaintenanceComplete: (tankId: string) => void;
   advanceIncidentStage: (stage: IncidentStage, note: string) => void;
@@ -184,17 +185,34 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedTankIdState]);
 
+  const refreshComplaints = useCallback(async () => {
+    try {
+      const backendComplaints = await fetchComplaintsApi();
+      setComplaints(backendComplaints);
+    } catch (err) {
+      console.warn('Failed to refresh complaints:', err);
+    }
+  }, []);
+
   // Polling loop
   useEffect(() => {
-    refreshData();
-    if (!isLiveUpdating) return;
+    const syncLiveData = () => {
+      void refreshData();
+      void refreshComplaints();
+    };
 
-    const interval = setInterval(() => {
-      refreshData();
-    }, LIVE_TELEMETRY_REFRESH_MS);
+    const initialSync = setTimeout(syncLiveData, 0);
+    if (!isLiveUpdating) {
+      return () => clearTimeout(initialSync);
+    }
 
-    return () => clearInterval(interval);
-  }, [isLiveUpdating, refreshData]);
+    const interval = setInterval(syncLiveData, LIVE_TELEMETRY_REFRESH_MS);
+
+    return () => {
+      clearTimeout(initialSync);
+      clearInterval(interval);
+    };
+  }, [isLiveUpdating, refreshData, refreshComplaints]);
 
   const runAIInference = useCallback(async (): Promise<AIPredictionData> => {
     try {
@@ -238,8 +256,19 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
           fetchWaterTestsApi(),
           fetchIncidentsApi(),
         ]);
-        if (backendTanks && backendTanks.length > 0) setTanks(backendTanks);
-        if (backendHostels && backendHostels.length > 0) setHostels(backendHostels);
+        if (backendTanks && backendTanks.length > 0) {
+          setTanks(backendTanks);
+          setSelectedTankIdState(backendTanks[0].id);
+          if (backendTanks[0].hostelId) {
+            setSelectedHostelIdState(backendTanks[0].hostelId);
+          }
+        }
+        if (backendHostels && backendHostels.length > 0) {
+          setHostels(backendHostels);
+          if (!backendTanks?.[0]?.hostelId) {
+            setSelectedHostelIdState(backendHostels[0].id);
+          }
+        }
         if (backendAlerts && backendAlerts.length > 0) setAlerts(backendAlerts);
         if (backendComplaints && backendComplaints.length > 0) setComplaints(backendComplaints);
         if (backendWaterTests && backendWaterTests.length > 0) setWaterTests(backendWaterTests);
@@ -288,14 +317,22 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const updateComplaintStatus = (id: string, status: Complaint['status'], adminNotes?: string) => {
+  const updateComplaintStatus = async (id: string, status: Complaint['status'], adminNotes?: string) => {
+    const previousComplaints = complaints;
     setComplaints((prev) =>
       prev.map((c) => (c.id === id ? { ...c, status, adminNotes: adminNotes ?? c.adminNotes } : c))
     );
     const numId = parseInt(id.replace('#', ''), 10);
     if (!isNaN(numId)) {
-      updateComplaintStatusApi(numId, status, adminNotes);
+      const didPersist = await updateComplaintStatusApi(numId, status, adminNotes);
+      if (!didPersist) {
+        setComplaints(previousComplaints);
+        console.warn(`Failed to persist complaint ${id} status update to ${status}`);
+        return false;
+      }
+      await refreshComplaints();
     }
+    return true;
   };
 
   const addWaterTest = (testData: Omit<WaterTestReport, 'id' | 'reportNumber'>) => {
@@ -381,6 +418,7 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
         setIsLiveUpdating,
         lastRefreshTime,
         refreshData,
+        refreshComplaints,
         runAIInference,
         resolveAlert,
         investigateAlert,

@@ -24,6 +24,7 @@ import {
   INITIAL_WATER_TESTS,
   INITIAL_INCIDENT,
   generateHistoricalReadings,
+  MOCK_TELEMETRY_ANCHOR_ISO,
 } from './mockData';
 import {
   fetchLatestReading,
@@ -42,6 +43,8 @@ import {
   fetchAIPrediction,
   triggerAIInference
 } from './api';
+
+const LIVE_TELEMETRY_REFRESH_MS = 5000;
 
 interface AquaGuardContextType {
   role: Role;
@@ -103,7 +106,9 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
   const [waterTests, setWaterTests] = useState<WaterTestReport[]>(INITIAL_WATER_TESTS);
   const [incident, setIncident] = useState<Incident>(INITIAL_INCIDENT);
   const [isLiveUpdating, setIsLiveUpdating] = useState<boolean>(true);
-  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(
+    () => new Date(MOCK_TELEMETRY_ANCHOR_ISO),
+  );
 
   const selectedTank = tanks.find((t) => t.id === selectedTankIdState) || tanks[0];
   const selectedHostel = hostels.find((h) => h.id === selectedHostelId) || hostels[0];
@@ -148,19 +153,32 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
   const refreshData = useCallback(async () => {
     try {
       const reading = await fetchLatestReading(selectedTankIdState);
-      // Add slight simulated jitter if reading was static to show live IoT pulse
-      const jitteredReading: SensorReading = {
-        ...reading,
-        turbidity: Number((reading.turbidity + (Math.random() * 0.08 - 0.04)).toFixed(2)),
-        tds: Math.round(reading.tds + (Math.random() * 2 - 1)),
-        ph: Number((reading.ph + (Math.random() * 0.02 - 0.01)).toFixed(2)),
-        temperature: Number((reading.temperature + (Math.random() * 0.06 - 0.03)).toFixed(2)),
-      };
 
-      setCurrentReading(jitteredReading);
+      setCurrentReading(reading);
+      setTanks((prev) =>
+        prev.map((tank) =>
+          tank.id === selectedTankIdState
+            ? {
+                ...tank,
+                waterLevelPercent: reading.water_level,
+                riskScore: reading.risk_score,
+                riskStatus:
+                  reading.risk_score >= 80
+                    ? 'CRITICAL'
+                    : reading.risk_score >= 50
+                    ? 'HIGH'
+                    : reading.risk_score >= 30
+                    ? 'ELEVATED'
+                    : 'NORMAL',
+                sensorStatus: 'ONLINE',
+                lastUpdated: reading.recorded_at,
+              }
+            : tank
+        )
+      );
       const history = await fetchReadingHistory(selectedTankIdState, 24);
       setHistoryReadings(history);
-      setLastRefreshTime(new Date());
+      setLastRefreshTime(reading.recorded_at ? new Date(reading.recorded_at) : new Date());
     } catch (e) {
       console.warn('Failed to refresh data', e);
     }
@@ -173,7 +191,7 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
 
     const interval = setInterval(() => {
       refreshData();
-    }, 5000);
+    }, LIVE_TELEMETRY_REFRESH_MS);
 
     return () => clearInterval(interval);
   }, [isLiveUpdating, refreshData]);
@@ -220,8 +238,19 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
           fetchWaterTestsApi(),
           fetchIncidentsApi(),
         ]);
-        if (backendTanks && backendTanks.length > 0) setTanks(backendTanks);
-        if (backendHostels && backendHostels.length > 0) setHostels(backendHostels);
+        if (backendTanks && backendTanks.length > 0) {
+          setTanks(backendTanks);
+          setSelectedTankIdState(backendTanks[0].id);
+          if (backendTanks[0].hostelId) {
+            setSelectedHostelIdState(backendTanks[0].hostelId);
+          }
+        }
+        if (backendHostels && backendHostels.length > 0) {
+          setHostels(backendHostels);
+          if (!backendTanks?.[0]?.hostelId) {
+            setSelectedHostelIdState(backendHostels[0].id);
+          }
+        }
         if (backendAlerts && backendAlerts.length > 0) setAlerts(backendAlerts);
         if (backendComplaints && backendComplaints.length > 0) setComplaints(backendComplaints);
         if (backendWaterTests && backendWaterTests.length > 0) setWaterTests(backendWaterTests);

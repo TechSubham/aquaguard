@@ -33,6 +33,7 @@ def format_tank(tank: Tank) -> dict:
         "tank_code": tank.tank_code,
         "block_id": tank.block_id,
         "block_name": tank.block.name if tank.block else None,
+        "hostel_id": tank.block.hostel.id if tank.block and tank.block.hostel else None,
         "hostel_name": tank.block.hostel.name if tank.block and tank.block.hostel else None,
         "capacity_liters": float(tank.capacity_liters or 0),
         "status": tank.status,

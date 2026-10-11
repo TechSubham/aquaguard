@@ -122,8 +122,15 @@ def update_complaint(
             try:
                 send_alert_email(
                     to_email=c.user.email,
-                    subject="Your AquaGuard Complaint is Resolved",
-                    message=f"The issue you reported regarding '{c.category}' has been marked as RESOLVED by the facilities team. Admin notes: {req.admin_notes or 'None'}"
+                    subject=f"AquaGuard report #{c.id} resolved",
+                    message=(
+                        "Your water-quality report has been marked as resolved by the facilities team.\n\n"
+                        f"Report: #{c.id}\n"
+                        f"Issue: {c.category}\n"
+                        f"Tank: {c.tank.tank_code if c.tank else 'Unassigned'}\n"
+                        f"Status: RESOLVED\n\n"
+                        f"Facilities note:\n{req.admin_notes or 'No additional notes were added.'}"
+                    )
                 )
             except Exception as e:
                 print(f"Failed to send complaint resolution email: {e}")

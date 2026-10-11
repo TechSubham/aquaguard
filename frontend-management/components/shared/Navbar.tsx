@@ -48,6 +48,7 @@ export function Navbar() {
 
   const handleLogout = () => {
     localStorage.removeItem('aquaguard_token');
+    localStorage.removeItem('aquaguard_admin_token');
     window.location.href = '/login';
   };
 

@@ -4,20 +4,17 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAquaGuard } from '@/lib/store';
-import { Button } from '@/components/ui/button';
 import {
   Droplet,
   ShieldAlert,
   MessageSquareWarning,
   ClipboardList,
   Home,
-  ShieldCheck,
-  ArrowRight,
 } from 'lucide-react';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { role, setRole, alerts } = useAquaGuard();
+  const { alerts } = useAquaGuard();
 
   const activeAlertsCount = alerts.filter((a) => a.status !== 'RESOLVED').length;
 
@@ -37,34 +34,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   return (
     <div className="flex-1 bg-[#F3F4F6] text-[#0B1B22] flex flex-col">
       <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-8 py-4 sm:py-6 pb-24 sm:pb-10 space-y-5">
-        {/* Administrator Preview Notification Banner */}
-        {role === 'ADMIN' && (
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl border border-slate-200 bg-white text-xs shadow-sm">
-            <div className="flex items-center gap-2.5 text-slate-700">
-              <ShieldCheck className="h-4 w-4 text-[#0284C7]" />
-              <span>
-                <strong className="text-slate-900 font-semibold">Admin Mode:</strong> You are currently previewing the Student Portal.
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setRole('STUDENT')}
-                className="h-7 text-xs rounded-full border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-              >
-                Set Role to Student
-              </Button>
-              <Link
-                href="/admin/dashboard"
-                className="h-7 px-3 text-xs bg-[#0B1B22] text-white hover:bg-black font-semibold rounded-full inline-flex items-center gap-1 transition-colors"
-              >
-                Command Center <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          </div>
-        )}
-
         {/* Student View Page Content */}
         {children}
       </main>

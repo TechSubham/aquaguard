@@ -43,10 +43,12 @@ export default function AdminComplaintsPage() {
     resolved: complaints.filter((c) => c.status === 'RESOLVED').length,
   };
 
-  const handleStatusChange = (status: Complaint['status']) => {
+  const handleStatusChange = async (status: Complaint['status']) => {
     if (!selectedComplaint) return;
-    updateComplaintStatus(selectedComplaint.id, status, adminNoteInput || undefined);
-    setSelectedComplaint((prev) => (prev ? { ...prev, status, adminNotes: adminNoteInput || prev.adminNotes } : null));
+    const didPersist = await updateComplaintStatus(selectedComplaint.id, status, adminNoteInput || undefined);
+    if (didPersist) {
+      setSelectedComplaint((prev) => (prev ? { ...prev, status, adminNotes: adminNoteInput || prev.adminNotes } : null));
+    }
   };
 
   return (

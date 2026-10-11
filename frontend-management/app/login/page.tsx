@@ -48,6 +48,7 @@ export default function LoginPage() {
     // Save token
     if (res.access_token) {
       localStorage.setItem('aquaguard_token', res.access_token);
+      localStorage.setItem('aquaguard_admin_token', res.access_token);
     }
     
     // Update global state

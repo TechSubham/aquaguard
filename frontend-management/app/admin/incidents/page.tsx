@@ -22,10 +22,13 @@ import {
   Wrench,
   FileText,
   UserCheck,
+  MessageSquareWarning,
+  Building,
+  Clock,
 } from 'lucide-react';
 
 export default function IncidentsPage() {
-  const { incident, advanceIncidentStage } = useAquaGuard();
+  const { incident, complaints, updateComplaintStatus, advanceIncidentStage } = useAquaGuard();
 
   const [actionNote, setActionNote] = useState('');
   const [targetStage, setTargetStage] =
@@ -65,6 +68,10 @@ export default function IncidentsPage() {
 
   const currentStageIndex = STAGES.findIndex(
     (s) => s.stage === incident.currentStage
+  );
+  const complaintStatusRank = { OPEN: 0, INVESTIGATING: 1, RESOLVED: 2 };
+  const incidentComplaints = [...complaints].sort(
+    (a, b) => complaintStatusRank[a.status] - complaintStatusRank[b.status]
   );
 
   const handleAdvance = (stage: IncidentStage) => {
@@ -118,6 +125,121 @@ export default function IncidentsPage() {
           </Badge>
         </div>
       </div>
+
+      {/* Student Complaints Registered For Incident Triage */}
+      <Card className="border border-slate-300 bg-slate-50 shadow-sm">
+        <CardHeader className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+              <MessageSquareWarning className="h-4 w-4 text-sky-600" />
+              Student Complaints Linked To Incidents
+            </CardTitle>
+
+            <CardDescription className="text-slate-500">
+              Live student reports from the portal, shown here for incident triage and escalation.
+            </CardDescription>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="danger" className="border-red-200 bg-red-50 text-red-700">
+              {complaints.filter((c) => c.status === 'OPEN').length} OPEN
+            </Badge>
+            <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">
+              {complaints.filter((c) => c.status === 'INVESTIGATING').length} INVESTIGATING
+            </Badge>
+            <Badge variant="secondary">
+              {complaints.filter((c) => c.status === 'RESOLVED').length} RESOLVED
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3 pt-4">
+          {incidentComplaints.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+              <CheckCircle2 className="mx-auto mb-2 h-7 w-7 text-emerald-600" />
+              <div className="text-sm font-semibold text-slate-900">No student complaints registered yet</div>
+              <p className="mt-1 text-xs text-slate-500">
+                New student reports will appear here automatically when submitted from the student portal.
+              </p>
+            </div>
+          ) : (
+            incidentComplaints.slice(0, 6).map((item) => (
+              <div
+                key={item.id}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-sky-200"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-sm font-extrabold text-slate-900">
+                        {item.id}
+                      </span>
+                      <Badge
+                        variant={
+                          item.status === 'OPEN'
+                            ? 'danger'
+                            : item.status === 'INVESTIGATING'
+                            ? 'outline'
+                            : 'secondary'
+                        }
+                        className="font-mono text-[10px]"
+                      >
+                        {item.status}
+                      </Badge>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                        <Building className="h-3 w-3" />
+                        {item.block}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                        <Clock className="h-3 w-3" />
+                        {item.submittedAt}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                      {item.issues.join(', ') || 'Water quality report'}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                      {item.description}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                      <span>Student: <strong className="text-slate-700">{item.studentName}</strong></span>
+                      <span>Tank: <strong className="font-mono text-slate-700">{item.tankId}</strong></span>
+                      {item.adminNotes && (
+                        <span>Note: <strong className="text-slate-700">{item.adminNotes}</strong></span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    {item.status !== 'INVESTIGATING' && item.status !== 'RESOLVED' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 border-sky-200 bg-sky-50 text-xs text-sky-700 hover:bg-sky-100"
+                        onClick={() => updateComplaintStatus(item.id, 'INVESTIGATING', 'Linked to active incident workflow.')}
+                      >
+                        Mark Investigating
+                      </Button>
+                    )}
+                    {item.status !== 'RESOLVED' && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-8 bg-slate-900 text-xs text-white hover:bg-slate-800"
+                        onClick={() => updateComplaintStatus(item.id, 'RESOLVED', 'Resolved through incident response workflow.')}
+                      >
+                        Resolve
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       {/* Main Incident Overview */}
       <div className="rounded-2xl border border-slate-300 bg-slate-50 p-6 text-slate-900 shadow-sm">
