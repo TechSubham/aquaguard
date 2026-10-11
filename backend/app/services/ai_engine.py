@@ -46,6 +46,7 @@ class AIEngine:
         
         self.models_dir = models_dir or AI_MODELS_DIR
         self.models: Dict[str, Any] = {}
+        self.missing_model_files: List[str] = []
         self.det_features: List[str] = []
         self.ano_features: List[str] = []
         self.manifest: Dict[str, Any] = {}
@@ -109,10 +110,22 @@ class AIEngine:
                     self.models[key] = joblib.load(file_path)
                     print(f"[AI ENGINE] Loaded model {key} from {filename}")
                 else:
+                    self.missing_model_files.append(filename)
                     print(f"[AI ENGINE WARNING] Model file {filename} not found at {file_path}")
 
         except Exception as e:
             print(f"[AI ENGINE ERROR] Failed to load models: {e}")
+
+    @property
+    def inference_backend(self) -> str:
+        """Reports whether inference uses trained artifacts or calibrated rules."""
+        expected = {"det_2h", "det_4h", "det_6h", "anomaly"}
+        loaded = set(self.models.keys())
+        if expected.issubset(loaded):
+            return "xgboost_artifacts"
+        if loaded:
+            return "hybrid_xgboost_calibrated_fallback"
+        return "calibrated_fallback"
 
     def _ensure_history_window(
         self,
@@ -982,6 +995,9 @@ class AIEngine:
             "complaint_correlation": complaint_corr,
             "prediction_summary": prediction_summary,
             "model_version": "v2.0-XGBoost-Ensemble-24h",
+            "inference_backend": self.inference_backend,
+            "models_loaded": sorted(self.models.keys()),
+            "missing_model_files": self.missing_model_files,
             "last_inferred_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
             "safety_statement": "Predictions represent deterioration risk in monitored sensor indicators and sensor-behaviour anomalies across 24h historical telemetry. They do not certify drinking-water safety."
         }
