@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { useAquaGuard } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Database, Building, Layers, CheckCircle, AlertTriangle, ArrowRight, Activity, Droplets } from 'lucide-react';
+import { Database, Activity } from 'lucide-react';
 
 export default function TanksPage() {
   const { tanks, hostels, setSelectedTankId } = useAquaGuard();
@@ -143,7 +142,7 @@ export default function TanksPage() {
                   </span>
                 </div>
                 <div>
-                  <span className="text-sky-800/80 text-[10px] uppercase font-bold block">Last Maintenance</span>
+                  <span className="text-sky-800/80 text-[10px] uppercase font-bold block">Last Service</span>
                   <span className="text-slate-900 font-semibold mt-0.5 block">{tank.lastServiceDate}</span>
                 </div>
               </div>
@@ -151,7 +150,7 @@ export default function TanksPage() {
               {/* Action Bar */}
               <div className="flex items-center justify-between pt-3 border-t border-sky-200/80">
                 <span className="text-[11px] text-slate-600 font-mono">
-                  Next Service: {tank.nextServiceDate}
+                  Next Check: {tank.nextServiceDate}
                 </span>
 
                 <div className="flex items-center gap-2">

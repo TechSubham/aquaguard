@@ -82,6 +82,8 @@ export interface AlertItem {
 }
 
 export interface AIPredictionData {
+  status?: 'offline' | 'online';
+  message?: string;
   tankId: string;
   currentRiskPercent: number;
   riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';

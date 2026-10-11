@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -35,14 +37,25 @@ const int MQTT_BROKER_COUNT = sizeof(MQTT_BROKERS) / sizeof(MQTT_BROKERS[0]);
 const char* MQTT_TOPIC = "aquaguard/A2-ROOF-01/telemetry/readings";
 
 // =========================
+// AquaGuard AI HTTP endpoint
+// =========================
+// For Wokwi cloud/browser runs, expose your backend with ngrok or Cloudflare Tunnel
+// and set this to "https://your-tunnel.example/sensor-reading".
+// Leave empty to disable HTTP posting and use MQTT/serial only.
+const char* AI_HTTP_ENDPOINT = "";
+
+// =========================
 // Configuration
 // =========================
 const char* TANK_ID = "A2-ROOF-01";
 const char* FIRMWARE_VERSION = "wokwi-live-sensors-v2";
 const unsigned long TELEMETRY_INTERVAL_MS = 5000;
+const unsigned long MQTT_RECONNECT_INTERVAL_MS = 10000;
+const unsigned long SIMULATED_SAMPLE_INTERVAL_MINUTES = 5;
 const uint16_t MQTT_BUFFER_SIZE = 768;
 
 WiFiClient wifiClient;
+WiFiClientSecure secureHttpClient;
 PubSubClient mqttClient(wifiClient);
 OneWire oneWire(TEMP_PIN);
 DallasTemperature tempSensor(&oneWire);
@@ -50,6 +63,8 @@ float phRaw = 0.0;
 float tdsRaw = 0.0;
 float turbidityRaw = 0.0;
 int mqttBrokerIndex = 0;
+unsigned long lastMqttAttemptMs = 0;
+unsigned long readingSequence = 0;
 
 String formatIp(IPAddress ip) {
     return String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
@@ -79,37 +94,101 @@ void connectWiFi() {
 // =========================
 // Connect MQTT
 // =========================
-void connectMQTT() {
+bool connectMQTT() {
 
-    while (!mqttClient.connected()) {
-
-        IPAddress broker = MQTT_BROKERS[mqttBrokerIndex];
-        mqttClient.setServer(broker, MQTT_PORT);
-
-        Serial.print("Connecting to MQTT ");
-        Serial.print(formatIp(broker));
-        Serial.print("...");
-
-        String clientId =
-            "AquaGuard-ESP32-" +
-            String(random(0xffff), HEX) +
-            "-" +
-            String(millis(), HEX);
-
-        if (mqttClient.connect(clientId.c_str())) {
-
-            Serial.println("connected!");
-
-        } else {
-
-            Serial.print("failed, rc=");
-            Serial.print(mqttClient.state());
-            Serial.println(" retrying...");
-
-            mqttBrokerIndex = (mqttBrokerIndex + 1) % MQTT_BROKER_COUNT;
-            delay(3000);
-        }
+    if (mqttClient.connected()) {
+        return true;
     }
+
+    IPAddress broker = MQTT_BROKERS[mqttBrokerIndex];
+    mqttClient.setServer(broker, MQTT_PORT);
+
+    Serial.print("Connecting to MQTT ");
+    Serial.print(formatIp(broker));
+    Serial.print("...");
+
+    String clientId =
+        "AquaGuard-ESP32-" +
+        String(random(0xffff), HEX) +
+        "-" +
+        String(millis(), HEX);
+
+    if (mqttClient.connect(clientId.c_str())) {
+
+        Serial.println("connected!");
+        return true;
+
+    } else {
+
+        Serial.print("failed, rc=");
+        Serial.print(mqttClient.state());
+        Serial.println(" will retry later");
+
+        mqttBrokerIndex = (mqttBrokerIndex + 1) % MQTT_BROKER_COUNT;
+        return false;
+    }
+}
+
+void buildSimulatedTimestamp(char* buffer, size_t bufferSize) {
+    unsigned long totalMinutes =
+        readingSequence * SIMULATED_SAMPLE_INTERVAL_MINUTES;
+
+    int day =
+        11 + (totalMinutes / 1440);
+
+    int hour =
+        (totalMinutes / 60) % 24;
+
+    int minute =
+        totalMinutes % 60;
+
+    snprintf(
+        buffer,
+        bufferSize,
+        "2026-10-%02dT%02d:%02d:00Z",
+        day,
+        hour,
+        minute
+    );
+}
+
+bool postToAquaGuardAI(const char* payload) {
+
+    if (strlen(AI_HTTP_ENDPOINT) == 0) {
+        return false;
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+        return false;
+    }
+
+    HTTPClient http;
+    String endpoint = String(AI_HTTP_ENDPOINT);
+    bool began = false;
+
+    if (endpoint.startsWith("https://")) {
+        secureHttpClient.setInsecure();
+        began = http.begin(secureHttpClient, endpoint);
+    } else {
+        began = http.begin(endpoint);
+    }
+
+    if (!began) {
+        Serial.println("  http_post:        FAILED_TO_BEGIN");
+        return false;
+    }
+
+    http.addHeader("Content-Type", "application/json");
+    int statusCode = http.POST((uint8_t*) payload, strlen(payload));
+
+    Serial.print("  http_endpoint:    ");
+    Serial.println(endpoint);
+    Serial.print("  http_status:      ");
+    Serial.println(statusCode);
+
+    http.end();
+
+    return statusCode >= 200 && statusCode < 300;
 }
 
 // =========================
@@ -258,11 +337,18 @@ void setup() {
 // =========================
 void loop() {
 
-    if (!mqttClient.connected()) {
+    if (
+        !mqttClient.connected()
+        &&
+        millis() - lastMqttAttemptMs >= MQTT_RECONNECT_INTERVAL_MS
+    ) {
+        lastMqttAttemptMs = millis();
         connectMQTT();
     }
 
-    mqttClient.loop();
+    if (mqttClient.connected()) {
+        mqttClient.loop();
+    }
 
     // Simulation time
     float t = getSimulationTime();
@@ -293,6 +379,12 @@ void loop() {
             turbidity
         );
 
+    char simulatedTimestamp[32];
+    buildSimulatedTimestamp(
+        simulatedTimestamp,
+        sizeof(simulatedTimestamp)
+    );
+
     // High-risk indicator
     digitalWrite(
         LED_PIN,
@@ -313,6 +405,7 @@ void loop() {
         "\"tank_id\":\"%s\","
         "\"firmware_version\":\"%s\","
         "\"sensor_source\":\"wokwi-live-inputs\","
+        "\"timestamp\":\"%s\","
         "\"simulation_time\":%.0f,"
         "\"temperature\":%.2f,"
         "\"ph\":%.2f,"
@@ -328,6 +421,7 @@ void loop() {
         
         TANK_ID,
         FIRMWARE_VERSION,
+        simulatedTimestamp,
         t,
         temperature,
         ph,
@@ -346,8 +440,15 @@ void loop() {
     // =========================
 
     bool published =
+        mqttClient.connected()
+        &&
         mqttClient.publish(
             MQTT_TOPIC,
+            payload
+        );
+
+    bool posted =
+        postToAquaGuardAI(
             payload
         );
 
@@ -359,6 +460,8 @@ void loop() {
     Serial.println(FIRMWARE_VERSION);
     Serial.print("  simulation_time:  ");
     Serial.println(t, 0);
+    Serial.print("  ai_timestamp:     ");
+    Serial.println(simulatedTimestamp);
     Serial.print("  temperature (C):  ");
     Serial.println(temperature, 2);
     Serial.print("  ph:               ");
@@ -391,9 +494,13 @@ void loop() {
     Serial.println(MQTT_BUFFER_SIZE);
     Serial.print("  mqtt_publish:     ");
     Serial.println(published ? "SUCCESS" : "FAILED");
+    Serial.print("  http_post:        ");
+    Serial.println(posted ? "SUCCESS" : (strlen(AI_HTTP_ENDPOINT) == 0 ? "DISABLED" : "FAILED"));
     Serial.print("  json:             ");
     Serial.println(payload);
     Serial.println("================================");
+
+    readingSequence++;
 
     delay(TELEMETRY_INTERVAL_MS);
 }

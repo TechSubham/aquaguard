@@ -5,7 +5,6 @@ import {
   AlertItem,
   AIPredictionData,
   Complaint,
-  WaterTestReport,
   Incident,
   SensorMetricCardData,
 } from './types';
@@ -41,9 +40,6 @@ export const INITIAL_TANKS: Tank[] = [
     lastUpdated: MOCK_TELEMETRY_ANCHOR_ISO,
     lastServiceDate: '12 Sep 2026',
     nextServiceDate: '12 Oct 2026',
-    maintenanceStatus: 'DUE_SOON',
-    maintenanceType: 'Carbon & Sediment Filter Replacement',
-    aiMaintenanceRisk: 78,
   },
 ];
 
@@ -246,7 +242,7 @@ export const INITIAL_AI_PREDICTION: AIPredictionData = {
   ],
   possibleCauses: [
     { cause: 'Sediment Filter Membrane Degradation', confidencePercent: 74, notes: 'Pressure drop & particulate spike matches filter breakthrough pattern.' },
-    { cause: 'Municipal Feeder Line Silt Contamination', confidencePercent: 62, notes: 'Correlation with campus main inlet pipe maintenance earlier today.' },
+    { cause: 'Municipal Feeder Line Silt Contamination', confidencePercent: 62, notes: 'Correlation with campus main inlet pipe work earlier today.' },
     { cause: 'Internal Tank Biofilm Sloughing', confidencePercent: 38, notes: 'Less probable given recent chemical wash on 12 Sep.' },
   ],
   recommendedActions: [
@@ -287,24 +283,6 @@ export const INITIAL_COMPLAINTS: Complaint[] = [
   },
 ];
 
-export const INITIAL_WATER_TESTS: WaterTestReport[] = [
-  {
-    id: 'LAB-2026-881',
-    tankId: 'A2-ROOF-01',
-    testDate: '06 Oct 2026',
-    laboratory: 'NSUT Environmental Engineering Laboratory',
-    ph: 7.1,
-    tds: 285,
-    turbidity: 1.1,
-    eColi: 'NEGATIVE',
-    coliform: 'NEGATIVE',
-    certifiedBy: 'Dr. V. Sharma, Lead Chemist',
-    reportNumber: 'AQUA-CERT-NSUT-2026-0881',
-    status: 'PASSED',
-    notes: 'Microbiological culture showed zero CFU/100ml. Physical parameters within potable standards as of Oct 6.',
-  },
-];
-
 export const INITIAL_INCIDENT: Incident = {
   id: 'INC-42',
   incidentNumber: 42,
@@ -334,7 +312,7 @@ export const INITIAL_INCIDENT: Incident = {
       label: 'Remediation Action',
       timestamp: 'Pending (Scheduled 10:45 PM)',
       note: 'Isolation of main intake valve and deployment of secondary replacement cartridge.',
-      actor: 'Maintenance Crew',
+      actor: 'Operations Crew',
     },
     {
       stage: 'TESTING',

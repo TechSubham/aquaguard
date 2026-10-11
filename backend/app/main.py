@@ -15,6 +15,13 @@ from app.routes.consumption import router as consumption_router
 from app.routes.leakage import router as leakage_router
 from app.routes.notifications import router as notifications_router
 from app.routes.ai import router as ai_router
+from app.routes.ai import (
+    LiveSensorReading,
+    ingest_live_sensor_reading,
+    get_live_prediction,
+    get_live_history,
+    reset_live_tank,
+)
 
 from app.services.mqtt_service import start_mqtt
 
@@ -85,3 +92,23 @@ def health():
         "status": "healthy",
         "database": "connected"
     }
+
+
+@app.post("/sensor-reading", tags=["AI Live Inference"])
+def sensor_reading_alias(reading: LiveSensorReading):
+    return ingest_live_sensor_reading(reading)
+
+
+@app.get("/prediction/{tank_id}", tags=["AI Live Inference"])
+def prediction_alias(tank_id: str):
+    return get_live_prediction(tank_id)
+
+
+@app.get("/history/{tank_id}", tags=["AI Live Inference"])
+def live_history_alias(tank_id: str):
+    return get_live_history(tank_id)
+
+
+@app.post("/reset/{tank_id}", tags=["AI Live Inference"])
+def reset_alias(tank_id: str):
+    return reset_live_tank(tank_id)

@@ -11,16 +11,12 @@ import {
   AlertTriangle,
   BrainCircuit,
   MessageSquareWarning,
-  Wrench,
-  FlaskConical,
   GitBranch,
   FileText,
   Settings,
-  HelpCircle,
   Droplets,
   ShieldAlert,
   ClipboardList,
-  LogOut,
 } from 'lucide-react';
 
 interface NavItem {
@@ -45,8 +41,6 @@ export function Sidebar() {
     { label: 'Alerts', href: '/admin/alerts', icon: AlertTriangle, badge: activeAlertsCount > 0 ? activeAlertsCount : undefined },
     { label: 'AI Prediction', href: '/admin/ai-prediction', icon: BrainCircuit, tag: 'USP' },
     { label: 'Complaints', href: '/admin/complaints', icon: MessageSquareWarning, badge: openComplaintsCount > 0 ? openComplaintsCount : undefined },
-    { label: 'Maintenance', href: '/admin/maintenance', icon: Wrench },
-    { label: 'Water Testing', href: '/admin/water-tests', icon: FlaskConical },
     { label: 'Incidents', href: '/admin/incidents', icon: GitBranch },
     { label: 'Reports', href: '/admin/reports', icon: FileText },
     { label: 'Settings', href: '/admin/settings', icon: Settings },

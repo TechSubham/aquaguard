@@ -14,22 +14,20 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  Sparkles,
   RefreshCw,
   Cpu,
-  Layers,
   Clock,
   ShieldAlert,
-  Wrench,
   Droplets,
   MessageSquareWarning,
   Info,
   Sliders,
   Check,
+  Radio,
 } from 'lucide-react';
 
 export default function AIPredictionPage() {
-  const { selectedTank, aiPrediction, currentReading, refreshData, runAIInference } = useAquaGuard();
+  const { selectedTank, aiPrediction, runAIInference } = useAquaGuard();
   const [isInferring, setIsInferring] = useState(false);
   const [workOrderDispatched, setWorkOrderDispatched] = useState(false);
 
@@ -49,586 +47,519 @@ export default function AIPredictionPage() {
 
   const isCritical = aiPrediction.currentRiskPercent >= 70;
   const isModerate = aiPrediction.currentRiskPercent >= 40 && aiPrediction.currentRiskPercent < 70;
+  const riskBadgeVariant = isCritical ? 'critical' : isModerate ? 'warning' : 'success';
+  const riskTone = isCritical
+    ? 'text-red-700 bg-red-50 border-red-200'
+    : isModerate
+    ? 'text-amber-700 bg-amber-50 border-amber-200'
+    : 'text-emerald-700 bg-emerald-50 border-emerald-200';
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono px-2 py-0.5 rounded border border-white text-white bg-zinc-900 flex items-center gap-1">
-              <Sparkles className="h-3 w-3" /> AquaGuard AI Predictive Engine
+    <div className="space-y-6 pb-12 animate-in fade-in duration-200">
+      <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200/90 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#0369A1]">
+              <BrainCircuit className="h-3.5 w-3.5" />
+              AquaGuard AI
             </span>
-            <span className="text-xs font-mono text-zinc-400">Architecture: XGBoost Multi-Horizon Ensemble</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700">
+              <Radio className="h-3 w-3" />
+              XGBoost live inference
+            </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-            <BrainCircuit className="h-6 w-6 text-white" />
-            Predictive Water Deterioration & Root Cause Analytics
-          </h1>
-          <p className="text-xs text-zinc-400 mt-1 max-w-3xl">
-            AquaGuard’s AI intelligence layer goes beyond passive monitoring: forecasting future contamination risk before tap delivery,
-            attributing physical root causes, and prescribing corrective interventions.
-          </p>
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1B22] sm:text-3xl">
+              Predictive Water Deterioration
+            </h1>
+            <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">
+              Forecast deterioration risk, explain the strongest telemetry signals, and translate model output into facility actions.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <TankSelector />
-          <Button
-            onClick={handleRunInference}
-            disabled={isInferring}
-            variant="default"
-            size="sm"
-            className="flex items-center gap-1.5 font-mono text-xs"
-          >
+          <Button onClick={handleRunInference} disabled={isInferring} size="sm" className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${isInferring ? 'animate-spin' : ''}`} />
-            {isInferring ? 'Running Inference...' : 'Trigger Model Run'}
+            {isInferring ? 'Running' : 'Run model'}
           </Button>
         </div>
       </div>
 
       {aiPrediction?.status === 'offline' ? (
-        <div className="p-8 rounded-lg border border-red-900/50 bg-red-950/20 flex flex-col items-center justify-center text-center space-y-4 mt-8">
-          <AlertTriangle className="h-12 w-12 text-red-500 animate-pulse" />
-          <h2 className="text-2xl font-bold text-red-500 tracking-tight">SENSORS ARE OFFLINE</h2>
-          <p className="text-sm text-zinc-400 max-w-md">
-            {aiPrediction.message || "No telemetry data found for this tank. Please ensure the IoT hardware is powered on and connected to the MQTT broker."}
+        <div className="rounded-[28px] border border-red-200 bg-red-50 p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-red-200 bg-white">
+            <AlertTriangle className="h-7 w-7 text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-red-800">Sensors are offline</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-red-700">
+            {aiPrediction.message || 'No telemetry data found for this tank. Check the IoT hardware or MQTT bridge.'}
           </p>
         </div>
       ) : (
         <>
-      {/* Safety Notice Banner */}
-      <div className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-950/80 flex items-center justify-between text-xs text-zinc-400">
-        <div className="flex items-center gap-2.5">
-          <Info className="h-4 w-4 text-zinc-300 flex-shrink-0" />
-          <span>
-            <strong className="text-zinc-200">Regulatory Scope: </strong>
-            {aiPrediction.safetyStatement ||
-              'Predictions represent deterioration risk in monitored physicochemical sensor indicators and sensor-behaviour anomalies. They do not certify laboratory drinking-water safety.'}
-          </span>
-        </div>
-        <span className="font-mono text-[11px] text-zinc-500 hidden sm:inline">BIS IS-10500 Telemetry Alignment</span>
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Columns: Executive Risk, Trajectory, Contributing Factors */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* 1. Executive Risk Hero */}
-          <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-950 relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 relative z-10">
-              <div>
-                <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-                  Target Tank: {selectedTank.code} ({selectedTank.name})
-                </span>
-                <h2 className="text-xl font-bold text-white mt-1">Water Quality Deterioration Forecast</h2>
-                <p className="text-xs text-zinc-400 mt-1 max-w-xl">
-                  {aiPrediction.predictionSummary}
-                </p>
-              </div>
-
-              {/* Calibrated Risk Score Display */}
-              <div className="flex items-center sm:flex-col items-end sm:items-center bg-black border border-zinc-800 p-4 rounded-xl text-center min-w-[150px]">
-                <span className="text-[10px] font-mono uppercase text-zinc-400">Predicted Risk Score</span>
-                <div className="text-4xl font-extrabold font-mono tracking-tight text-white my-1">
-                  {aiPrediction.currentRiskPercent}
-                  <span className="text-lg text-zinc-500">/100</span>
-                </div>
-                <Badge
-                  variant={isCritical ? 'critical' : isModerate ? 'secondary' : 'outline'}
-                  className="font-mono text-[10px] tracking-wider"
-                >
-                  {aiPrediction.riskLevel} RISK
-                </Badge>
-              </div>
+          <div className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-sky-50/80 p-4 text-xs text-slate-600 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2.5">
+              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#0284C7]" />
+              <span>
+                <strong className="font-semibold text-slate-800">Regulatory scope: </strong>
+                {aiPrediction.safetyStatement ||
+                  'Predictions represent deterioration risk in monitored physicochemical sensor indicators and sensor-behaviour anomalies. They do not certify laboratory drinking-water safety.'}
+              </span>
             </div>
-
-            {/* Abnormal Water Behavior Banner (Slope Detection before thresholds) */}
-            {aiPrediction.currentRiskPercent > 60 && (
-              <div className="mt-5 p-4 rounded-lg border border-red-900/50 bg-black flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <div className="text-xs font-bold text-red-200 uppercase tracking-wide">
-                    ⚠️ Abnormal Deterioration Pattern Detected
-                  </div>
-                  <div className="text-xs text-zinc-300">
-                    High risk of water-quality deterioration within 4–6 hours. The AI detected accelerating deterioration trends in historical telemetry prior to hard threshold breach.
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 2. Trajectory Projections (+2h, +4h, +6h) */}
-            <div className="mt-6 pt-5 border-t border-zinc-800/80">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <TrendingUp className="h-4 w-4" /> Future Risk Trajectory (Multi-Horizon Projections)
-                </span>
-                <span className="text-[11px] font-mono text-zinc-500">Horizon: +2h, +4h, +6h</span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {aiPrediction.futureProjections.map((proj, idx) => {
-                  const isHigh = proj.riskPercent >= 70;
-                  const isMed = proj.riskPercent >= 40 && proj.riskPercent < 70;
-                  return (
-                    <div
-                      key={proj.timeOffset}
-                      className="p-3.5 rounded-lg border border-zinc-800 bg-black flex flex-col justify-between"
-                    >
-                      <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                        <span>{proj.timeOffset}</span>
-                        {idx > 0 && <span className="text-[10px] text-zinc-500">+{idx * 2}h horizon</span>}
-                      </div>
-
-                      <div className="my-2.5">
-                        <div className="text-2xl font-bold font-mono text-white">
-                          {proj.riskPercent}%
-                        </div>
-                        <div className="w-full bg-zinc-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              isHigh ? 'bg-red-500' : isMed ? 'bg-amber-400' : 'bg-white'
-                            }`}
-                            style={{ width: `${proj.riskPercent}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <span className="text-[10px] font-mono text-zinc-400 uppercase">
-                        {isHigh ? '🔴 Critical' : isMed ? '🟠 Moderate' : '🟢 Low Risk'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <span className="whitespace-nowrap rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-500 shadow-sm">
+              BIS IS-10500 aligned telemetry
+            </span>
           </div>
 
-          {/* 24-Hour Historical Telemetry Evolution & Macro Baseline Drift Card */}
-          <Card className="border border-zinc-800 bg-zinc-950">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-md bg-zinc-900 border border-zinc-800">
-                    <Clock className="h-4 w-4 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      24-Hour Historical Telemetry Window
-                      <Badge variant="outline" className="font-mono text-[10px] text-zinc-300 border-zinc-700">
-                        {aiPrediction.historyWindowHours || 24} Hours ({aiPrediction.history24hSummary?.sample_count || 288} Samples)
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Continuous 24-hour baseline comparison vs. short-term 60m fluctuations
-                    </CardDescription>
-                  </div>
-                </div>
-                <div className="text-[11px] font-mono text-zinc-400">
-                  Cumulative Exposure: <span className="text-white font-bold">{aiPrediction.history24hSummary?.cumulative_turbidity_load ?? 188.9} NTU·L/hr</span>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Macro metrics 3-column grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                {/* Turbidity 24h drift */}
-                <div className="p-3 rounded-lg border border-zinc-800 bg-black flex flex-col justify-between">
-                  <div className="flex justify-between items-center text-zinc-400 font-mono text-[11px]">
-                    <span>Turbidity (24h Drift)</span>
-                    <span className="text-[10px] text-zinc-500">24h ago: {aiPrediction.history24hSummary?.turbidity?.at_24h_ago ?? 0.88} NTU</span>
-                  </div>
-                  <div className="my-1.5 flex items-baseline gap-2">
-                    <span className="text-xl font-bold font-mono text-white">
-                      {aiPrediction.history24hSummary?.turbidity?.current ?? 6.88} NTU
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              <section className="card-elevated overflow-hidden p-6">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                      Target tank: {selectedTank.code} ({selectedTank.name})
                     </span>
-                    <span className={`text-xs font-mono font-semibold ${
-                      (aiPrediction.history24hSummary?.turbidity?.net_drift_24h ?? 0) > 1.0 ? 'text-red-400' : 'text-emerald-400'
-                    }`}>
-                      {(aiPrediction.history24hSummary?.turbidity?.net_drift_24h ?? 0) >= 0 ? '+' : ''}
-                      {aiPrediction.history24hSummary?.turbidity?.net_drift_24h ?? 6.0} NTU
-                    </span>
+                    <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">
+                      Water quality forecast
+                    </h2>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500">
+                      {aiPrediction.predictionSummary}
+                    </p>
                   </div>
-                  <div className="text-[10px] text-zinc-400">
-                    24h Range: {aiPrediction.history24hSummary?.turbidity?.min_24h ?? 0.88} – {aiPrediction.history24hSummary?.turbidity?.max_24h ?? 6.88} NTU (Mean {aiPrediction.history24hSummary?.turbidity?.mean_24h ?? 2.2})
+
+                  <div className={`min-w-[160px] rounded-2xl border p-4 text-center ${riskTone}`}>
+                    <span className="text-[10px] font-bold uppercase tracking-wide">Predicted risk</span>
+                    <div className="my-1 font-mono text-4xl font-extrabold tracking-tight">
+                      {aiPrediction.currentRiskPercent}
+                      <span className="text-lg opacity-60">/100</span>
+                    </div>
+                    <Badge variant={riskBadgeVariant} className="justify-center">
+                      {aiPrediction.riskLevel} risk
+                    </Badge>
                   </div>
                 </div>
 
-                {/* TDS 24h drift */}
-                <div className="p-3 rounded-lg border border-zinc-800 bg-black flex flex-col justify-between">
-                  <div className="flex justify-between items-center text-zinc-400 font-mono text-[11px]">
-                    <span>TDS Accumulation</span>
-                    <span className="text-[10px] text-zinc-500">24h ago: {aiPrediction.history24hSummary?.tds?.at_24h_ago ?? 272} ppm</span>
+                {aiPrediction.currentRiskPercent > 60 && (
+                  <div className="mt-5 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-4">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
+                    <div>
+                      <div className="text-xs font-bold uppercase tracking-wide text-red-800">
+                        Abnormal deterioration pattern detected
+                      </div>
+                      <div className="mt-1 text-xs leading-relaxed text-red-700">
+                        The model detected accelerating deterioration trends in historical telemetry before a hard threshold breach.
+                      </div>
+                    </div>
                   </div>
-                  <div className="my-1.5 flex items-baseline gap-2">
-                    <span className="text-xl font-bold font-mono text-white">
-                      {aiPrediction.history24hSummary?.tds?.current ?? 486} ppm
-                    </span>
-                    <span className={`text-xs font-mono font-semibold ${
-                      (aiPrediction.history24hSummary?.tds?.net_drift_24h ?? 0) > 40 ? 'text-red-400' : 'text-emerald-400'
-                    }`}>
-                      {(aiPrediction.history24hSummary?.tds?.net_drift_24h ?? 0) >= 0 ? '+' : ''}
-                      {aiPrediction.history24hSummary?.tds?.net_drift_24h ?? 214} ppm
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-zinc-400">
-                    24h Peak: {aiPrediction.history24hSummary?.tds?.max_24h ?? 486} ppm (Mean {aiPrediction.history24hSummary?.tds?.mean_24h ?? 338.7})
-                  </div>
-                </div>
+                )}
 
-                {/* pH 24h drift */}
-                <div className="p-3 rounded-lg border border-zinc-800 bg-black flex flex-col justify-between">
-                  <div className="flex justify-between items-center text-zinc-400 font-mono text-[11px]">
-                    <span>pH Acidification Shift</span>
-                    <span className="text-[10px] text-zinc-500">24h ago: {aiPrediction.history24hSummary?.ph?.at_24h_ago ?? 7.28}</span>
-                  </div>
-                  <div className="my-1.5 flex items-baseline gap-2">
-                    <span className="text-xl font-bold font-mono text-white">
-                      {aiPrediction.history24hSummary?.ph?.current ?? 6.39}
+                <div className="mt-6 border-t border-slate-100 pt-5">
+                  <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-700">
+                      <TrendingUp className="h-4 w-4 text-[#0284C7]" />
+                      Future risk trajectory
                     </span>
-                    <span className={`text-xs font-mono font-semibold ${
-                      Math.abs(aiPrediction.history24hSummary?.ph?.net_drift_24h ?? 0) > 0.3 ? 'text-amber-400' : 'text-emerald-400'
-                    }`}>
-                      {(aiPrediction.history24hSummary?.ph?.net_drift_24h ?? 0) >= 0 ? '+' : ''}
-                      {aiPrediction.history24hSummary?.ph?.net_drift_24h ?? -0.89}
-                    </span>
+                    <span className="text-[11px] font-semibold text-slate-400">Current, +2h, +4h, +6h</span>
                   </div>
-                  <div className="text-[10px] text-zinc-400">
-                    24h Range: {aiPrediction.history24hSummary?.ph?.min_24h ?? 6.39} – {aiPrediction.history24hSummary?.ph?.max_24h ?? 7.28}
-                  </div>
-                </div>
-              </div>
 
-              {/* 24-hour visual trend timeline bar */}
-              {aiPrediction.history24hSnapshots && aiPrediction.history24hSnapshots.length > 0 && (
-                <div className="p-3 rounded-lg border border-zinc-800/80 bg-zinc-900/30 space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                    <span className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                      <TrendingUp className="h-3.5 w-3.5 text-white" /> 24-Hour Hourly Telemetry Snapshots
-                    </span>
-                    <span>T-24h → T-0h (Now)</span>
-                  </div>
-                  <div className="flex items-end gap-1 h-12 pt-2">
-                    {aiPrediction.history24hSnapshots.map((snap, i) => {
-                      const tVal = snap.turbidity;
-                      const heightPercent = Math.min(100, Math.max(15, (tVal / 7.0) * 100));
-                      const isDanger = tVal >= 5.0;
-                      const isWarn = tVal >= 2.0 && tVal < 5.0;
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {aiPrediction.futureProjections.map((proj, idx) => {
+                      const isHigh = proj.riskPercent >= 70;
+                      const isMed = proj.riskPercent >= 40 && proj.riskPercent < 70;
+                      const barColor = isHigh ? 'bg-red-500' : isMed ? 'bg-amber-400' : 'bg-emerald-500';
                       return (
-                        <div
-                          key={i}
-                          className="flex-1 flex flex-col items-center group relative h-full justify-end"
-                        >
-                          <div
-                            className={`w-full rounded-t-sm transition-all duration-300 ${
-                              isDanger ? 'bg-red-500' : isWarn ? 'bg-amber-400' : 'bg-emerald-500/80'
-                            }`}
-                            style={{ height: `${heightPercent}%` }}
-                          />
-                          {/* Tooltip on hover */}
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 z-20 pointer-events-none bg-black border border-zinc-700 text-[9px] font-mono p-1 rounded shadow-lg whitespace-nowrap">
-                            <div>{snap.hour_offset === 0 ? 'Now' : `${snap.hour_offset}h`}</div>
-                            <div>Turb: {snap.turbidity} NTU</div>
-                            <div>TDS: {snap.tds} ppm</div>
+                        <div key={proj.timeOffset} className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                            <span>{proj.timeOffset}</span>
+                            {idx > 0 && <span>+{idx * 2}h</span>}
                           </div>
+                          <div className="my-2.5 font-mono text-2xl font-bold text-slate-900">
+                            {proj.riskPercent}%
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${proj.riskPercent}%` }} />
+                          </div>
+                          <span className="mt-2 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                            {isHigh ? 'Critical' : isMed ? 'Moderate' : 'Low'}
+                          </span>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="flex justify-between text-[9px] font-mono text-zinc-500 pt-1">
-                    <span>-24 hrs (Safe Baseline)</span>
-                    <span>-12 hrs</span>
-                    <span>-6 hrs (Inflection)</span>
-                    <span>Now</span>
-                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </section>
 
-          {/* 3. Parameter Contributing Factors ("Why is it X%?") */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    Why is the risk score {aiPrediction.currentRiskPercent}%? (Signal Attribution)
-                  </CardTitle>
-                  <CardDescription>
-                    Strongest contributing physicochemical signals driving deterioration probability
-                  </CardDescription>
-                </div>
-                <Badge variant="outline" className="font-mono text-[10px]">
-                  Feature Importance Attribution
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3.5">
-              {aiPrediction.rootCauses.map((rc, idx) => {
-                const contributionPct = rc.contribution ? Math.round(rc.contribution * 100) : 75 - idx * 12;
-                return (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-900/50 space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded border border-zinc-800 bg-black flex items-center justify-center font-mono text-xs">
-                          {rc.trend === 'up' ? (
-                            <ArrowUpRight className="h-4 w-4 text-red-400" />
-                          ) : rc.trend === 'down' ? (
-                            <ArrowDownRight className="h-4 w-4 text-amber-400" />
-                          ) : (
-                            <span className="text-zinc-500">—</span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-xs font-semibold text-white">{rc.factor}</div>
-                          <div className="text-[11px] text-zinc-400">{rc.detail}</div>
-                        </div>
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                        <Clock className="h-4 w-4 text-[#0284C7]" />
                       </div>
-
-                      <div className="text-right">
-                        <span className="text-[10px] font-mono text-zinc-400 uppercase block">Contribution</span>
-                        <span className="text-xs font-mono font-bold text-white">{contributionPct}%</span>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar for Signal Contribution */}
-                    <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-zinc-200 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${contributionPct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          {/* 4. Dual Sensor Diagnostics: Anomaly Detection & Complaint Correlation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Sensor Anomaly Detector (Noise vs Real Problem) */}
-            <Card className="border border-zinc-800 bg-zinc-950">
-              <CardHeader className="pb-2.5">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Sliders className="h-4 w-4 text-zinc-300" />
-                  Sensor Anomaly Discrimination
-                </CardTitle>
-                <CardDescription className="text-[11px]">
-                  XGBoost + Robust Z-Score filter (Glitch vs Genuine Water Event)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2.5 text-xs">
-                {aiPrediction.anomalyDetected && aiPrediction.anomalyDetails?.is_sensor_glitch ? (
-                  <div className="p-3 rounded-lg border border-amber-900/40 bg-black space-y-1">
-                    <span className="text-amber-400 font-bold flex items-center gap-1.5 font-mono text-[11px]">
-                      <AlertTriangle className="h-3.5 w-3.5" /> TRANSIENT HARDWARE SPIKE
-                    </span>
-                    <p className="text-zinc-400 text-[11px]">
-                      A high-frequency jump was detected with zero physical continuity across concurrent sensors. Classified as electrical noise or optical probe fouling, not drinking water contamination.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-lg border border-zinc-800 bg-black space-y-1">
-                    <span className="text-emerald-400 font-bold flex items-center gap-1.5 font-mono text-[11px]">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> CONTINUOUS PHYSICAL TREND
-                    </span>
-                    <p className="text-zinc-400 text-[11px]">
-                      Telemetry passes temporal autocorrelation and robust median checks. Readings represent authentic fluid dynamics.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Student Complaint Correlation */}
-            <Card className="border border-zinc-800 bg-zinc-950">
-              <CardHeader className="pb-2.5">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <MessageSquareWarning className="h-4 w-4 text-zinc-300" />
-                  Student Complaint Correlation
-                </CardTitle>
-                <CardDescription className="text-[11px]">
-                  Cross-referencing reported student tickets with telemetry
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2.5 text-xs">
-                <div className="p-3 rounded-lg border border-zinc-800 bg-black space-y-1">
-                  <span className={`font-bold flex items-center gap-1.5 font-mono text-[11px] ${
-                    aiPrediction.complaintCorrelation?.correlated ? 'text-amber-400' : 'text-zinc-300'
-                  }`}>
-                    {aiPrediction.complaintCorrelation?.correlated ? '⚠️ TICKETS CORRELATED' : '✓ NO ACTIVE DISSONANCE'}
-                  </span>
-                  <p className="text-zinc-400 text-[11px]">
-                    {aiPrediction.complaintCorrelation?.summary ||
-                      'Student grievances in this block correlate with elevated turbidity and pH drift.'}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Right Column: Evidence Engine, Prescriptions, Secondary Predictions */}
-        <div className="space-y-6">
-          {/* 5. Possible Causes (Evidence Engine) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Cpu className="h-4 w-4" />
-                Diagnosed Root Causes
-              </CardTitle>
-              <CardDescription>Multi-sensor evidence engine evaluating plausible failures</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {aiPrediction.possibleCauses.length > 0 ? (
-                aiPrediction.possibleCauses.map((cause, i) => (
-                  <div key={i} className="p-4 rounded-xl border border-zinc-800 bg-black space-y-3">
-                    <div className="flex items-start justify-between">
                       <div>
-                        <div className="text-sm font-bold text-white flex items-center gap-2">
-                          {cause.cause}
-                          {i === 0 && (
-                            <Badge variant="outline" className="text-[9px] font-mono text-zinc-300 border-zinc-700">
-                              Top Cause
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-xs text-zinc-400 mt-0.5">{cause.notes}</div>
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          Historical telemetry window
+                          <Badge variant="outline">
+                            {aiPrediction.historyWindowHours || 24}h / {aiPrediction.history24hSummary?.sample_count || 288} samples
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription>Baseline comparison against short-term fluctuations</CardDescription>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase block">Confidence</span>
-                        <span className="text-base font-extrabold font-mono text-white">
-                          {cause.confidencePercent}%
+                    </div>
+                    <div className="text-[11px] font-semibold text-slate-500">
+                      Exposure: <span className="text-slate-900">{aiPrediction.history24hSummary?.cumulative_turbidity_load ?? 188.9} NTU L/hr</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
+                    <MetricPanel
+                      label="Turbidity drift"
+                      value={`${aiPrediction.history24hSummary?.turbidity?.current ?? 6.88} NTU`}
+                      delta={aiPrediction.history24hSummary?.turbidity?.net_drift_24h ?? 6}
+                      suffix="NTU"
+                      description={`Range ${aiPrediction.history24hSummary?.turbidity?.min_24h ?? 0.88} to ${aiPrediction.history24hSummary?.turbidity?.max_24h ?? 6.88} NTU`}
+                    />
+                    <MetricPanel
+                      label="TDS accumulation"
+                      value={`${aiPrediction.history24hSummary?.tds?.current ?? 486} ppm`}
+                      delta={aiPrediction.history24hSummary?.tds?.net_drift_24h ?? 214}
+                      suffix="ppm"
+                      description={`Peak ${aiPrediction.history24hSummary?.tds?.max_24h ?? 486} ppm`}
+                    />
+                    <MetricPanel
+                      label="pH shift"
+                      value={`${aiPrediction.history24hSummary?.ph?.current ?? 6.39}`}
+                      delta={aiPrediction.history24hSummary?.ph?.net_drift_24h ?? -0.89}
+                      suffix=""
+                      description={`Range ${aiPrediction.history24hSummary?.ph?.min_24h ?? 6.39} to ${aiPrediction.history24hSummary?.ph?.max_24h ?? 7.28}`}
+                    />
+                  </div>
+
+                  {aiPrediction.history24hSnapshots && aiPrediction.history24hSnapshots.length > 0 && (
+                    <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                        <span className="flex items-center gap-1.5 text-slate-700">
+                          <TrendingUp className="h-3.5 w-3.5 text-[#0284C7]" />
+                          Hourly turbidity snapshots
                         </span>
+                        <span>T-24h to now</span>
+                      </div>
+                      <div className="flex h-12 items-end gap-1 pt-2">
+                        {aiPrediction.history24hSnapshots.map((snap, i) => {
+                          const heightPercent = Math.min(100, Math.max(15, (snap.turbidity / 7.0) * 100));
+                          const isDanger = snap.turbidity >= 5.0;
+                          const isWarn = snap.turbidity >= 2.0 && snap.turbidity < 5.0;
+                          return (
+                            <div key={i} className="group relative flex h-full flex-1 items-end">
+                              <div
+                                className={`w-full rounded-t-sm transition-all duration-300 ${
+                                  isDanger ? 'bg-red-500' : isWarn ? 'bg-amber-400' : 'bg-emerald-500'
+                                }`}
+                                style={{ height: `${heightPercent}%` }}
+                              />
+                              <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 p-1.5 text-[9px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                                <div>{snap.hour_offset === 0 ? 'Now' : `${snap.hour_offset}h`}</div>
+                                <div>Turb: {snap.turbidity} NTU</div>
+                                <div>TDS: {snap.tds} ppm</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-between pt-1 text-[9px] font-semibold text-slate-400">
+                        <span>-24 hrs</span>
+                        <span>-12 hrs</span>
+                        <span>-6 hrs</span>
+                        <span>Now</span>
                       </div>
                     </div>
-
-                    {/* Confidence Meter */}
-                    <div className="space-y-1">
-                      <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="bg-white h-full rounded-full transition-all duration-500"
-                          style={{ width: `${cause.confidencePercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-4 rounded-lg border border-zinc-800 bg-black text-center py-6">
-                  <CheckCircle2 className="h-6 w-6 text-white mx-auto mb-2" />
-                  <div className="text-xs font-semibold text-white">Nominal Operating Signatures</div>
-                  <div className="text-[11px] text-zinc-400 mt-1">
-                    No mechanical fault or contamination signature detected.
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 6. Prescriptive Actions Playbook */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4" />
-                Prescriptive Action Playbook
-              </CardTitle>
-              <CardDescription>Automated operational protocol for facilities crew</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {aiPrediction.recommendedActions.map((action, i) => (
-                <div
-                  key={i}
-                  className="p-3 rounded-lg border border-zinc-800 bg-black flex items-start gap-3"
-                >
-                  <span className="w-5 h-5 rounded-full border border-zinc-700 bg-zinc-900 text-white font-mono text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-                    {i + 1}
-                  </span>
-                  <div className="text-xs text-zinc-300 font-medium leading-relaxed">{action}</div>
-                </div>
-              ))}
-
-              <div className="pt-2">
-                <Button
-                  onClick={handleDispatchWorkOrder}
-                  disabled={workOrderDispatched}
-                  className="w-full text-xs font-semibold"
-                  variant={workOrderDispatched ? 'outline' : 'default'}
-                >
-                  {workOrderDispatched ? (
-                    <span className="flex items-center gap-1.5 text-emerald-400">
-                      <Check className="h-3.5 w-3.5" /> Work Order #WO-840 Dispatched
-                    </span>
-                  ) : (
-                    'Dispatch Maintenance Work Order'
                   )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* 7. Secondary AI Capabilities: Maintenance & Leakage Predictions */}
-          <div className="space-y-3">
-            {/* Maintenance Forecast */}
-            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-950 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-white flex items-center gap-1.5">
-                  <Wrench className="h-3.5 w-3.5 text-zinc-400" /> Maintenance Urgency Forecast
-                </span>
-                <span className="font-mono text-zinc-300 font-bold">
-                  {aiPrediction.maintenancePrediction?.maintenance_window || '3–5 days'}
-                </span>
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Activity className="h-4 w-4 text-[#0284C7]" />
+                        Why is the risk score {aiPrediction.currentRiskPercent}%?
+                      </CardTitle>
+                      <CardDescription>Strongest signals driving deterioration probability</CardDescription>
+                    </div>
+                    <Badge variant="outline">Feature attribution</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3.5">
+                  {aiPrediction.rootCauses.map((rc, idx) => {
+                    const contributionPct = rc.contribution ? Math.round(rc.contribution * 100) : 75 - idx * 12;
+                    return (
+                      <div key={idx} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white">
+                              {rc.trend === 'up' ? (
+                                <ArrowUpRight className="h-4 w-4 text-red-500" />
+                              ) : rc.trend === 'down' ? (
+                                <ArrowDownRight className="h-4 w-4 text-amber-500" />
+                              ) : (
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-slate-900">{rc.factor}</div>
+                              <div className="text-xs leading-relaxed text-slate-500">{rc.detail}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Contribution</span>
+                            <span className="font-mono text-sm font-bold text-slate-900">{contributionPct}%</span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-full rounded-full bg-[#0284C7]" style={{ width: `${contributionPct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader className="pb-2.5">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Sliders className="h-4 w-4 text-[#0284C7]" />
+                      Sensor anomaly discrimination
+                    </CardTitle>
+                    <CardDescription>XGBoost and robust z-score filter</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {aiPrediction.anomalyDetected && aiPrediction.anomalyDetails?.is_sensor_glitch ? (
+                      <InsightPanel
+                        tone="warning"
+                        title="Transient hardware spike"
+                        body="A high-frequency jump was detected without physical continuity across concurrent sensors."
+                      />
+                    ) : (
+                      <InsightPanel
+                        tone="success"
+                        title="Continuous physical trend"
+                        body="Telemetry passes temporal autocorrelation and robust median checks."
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2.5">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <MessageSquareWarning className="h-4 w-4 text-[#0284C7]" />
+                      Complaint correlation
+                    </CardTitle>
+                    <CardDescription>Student reports cross-checked with telemetry</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <InsightPanel
+                      tone={aiPrediction.complaintCorrelation?.correlated ? 'warning' : 'neutral'}
+                      title={aiPrediction.complaintCorrelation?.correlated ? 'Tickets correlated' : 'No active dissonance'}
+                      body={aiPrediction.complaintCorrelation?.summary || 'Student grievances in this block correlate with elevated turbidity and pH drift.'}
+                    />
+                  </CardContent>
+                </Card>
               </div>
-              <p className="text-[11px] text-zinc-400">
-                {aiPrediction.maintenancePrediction?.recommendation ||
-                  'Filter maintenance and backwash recommended based on sensor degradation trends.'}
-              </p>
             </div>
 
-            {/* Leakage Prediction */}
-            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-950 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-white flex items-center gap-1.5">
-                  <Droplets className="h-3.5 w-3.5 text-zinc-400" /> Hydraulic Leakage Monitor
-                </span>
-                <span className="font-mono text-emerald-400 font-bold">
-                  {aiPrediction.leakagePrediction?.detected ? '⚠️ Leakage Suspected' : '✓ Normal'}
-                </span>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Cpu className="h-4 w-4 text-[#0284C7]" />
+                    Diagnosed root causes
+                  </CardTitle>
+                  <CardDescription>Multi-sensor evidence engine evaluating plausible failures</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {aiPrediction.possibleCauses.length > 0 ? (
+                    aiPrediction.possibleCauses.map((cause, i) => (
+                      <div key={i} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-900">
+                              {cause.cause}
+                              {i === 0 && <Badge variant="outline">Top cause</Badge>}
+                            </div>
+                            <div className="mt-1 text-xs leading-relaxed text-slate-500">{cause.notes}</div>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Confidence</span>
+                            <span className="font-mono text-base font-extrabold text-slate-900">{cause.confidencePercent}%</span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-full rounded-full bg-[#0284C7]" style={{ width: `${cause.confidencePercent}%` }} />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-center">
+                      <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-emerald-600" />
+                      <div className="text-sm font-bold text-emerald-800">Nominal operating signatures</div>
+                      <div className="mt-1 text-xs text-emerald-700">No mechanical fault signature detected.</div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ShieldAlert className="h-4 w-4 text-[#0284C7]" />
+                    Action playbook
+                  </CardTitle>
+                  <CardDescription>Operational protocol for the facilities crew</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {aiPrediction.recommendedActions.map((action, i) => (
+                    <div key={i} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#0B1B22] text-xs font-bold text-white">
+                        {i + 1}
+                      </span>
+                      <div className="text-xs font-medium leading-relaxed text-slate-700">{action}</div>
+                    </div>
+                  ))}
+
+                  <Button
+                    onClick={handleDispatchWorkOrder}
+                    disabled={workOrderDispatched}
+                    className="w-full gap-1.5"
+                    variant={workOrderDispatched ? 'outline' : 'default'}
+                  >
+                    {workOrderDispatched ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        Work order WO-840 dispatched
+                      </>
+                    ) : (
+                      'Dispatch operations work order'
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-3">
+                <ForecastPanel
+                  icon={<Droplets className="h-3.5 w-3.5 text-[#0284C7]" />}
+                  title="Hydraulic leakage monitor"
+                  value={aiPrediction.leakagePrediction?.detected ? 'Leakage suspected' : 'Normal'}
+                  body={aiPrediction.leakagePrediction?.recommendation || 'Water level decrease rate matches expected hourly student usage profiles.'}
+                />
               </div>
-              <p className="text-[11px] text-zinc-400">
-                {aiPrediction.leakagePrediction?.recommendation ||
-                  'Water level decrease rate matches expected hourly student usage profiles.'}
-              </p>
+
+              <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 text-[11px] font-semibold text-slate-500 shadow-sm">
+                <MetaRow label="Model architecture" value={aiPrediction.modelVersion} />
+                <MetaRow label="Last inferred" value={aiPrediction.lastInferenceAt} />
+                <MetaRow label="Inference latency" value="18ms on local CPU" />
+                <MetaRow label="API gateway" value="GET/POST /ai/predict-risk" />
+              </div>
             </div>
           </div>
-
-          {/* AI Metadata Box */}
-          <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-950 text-[11px] space-y-2 text-zinc-400 font-mono">
-            <div className="flex justify-between">
-              <span>Model Architecture:</span>
-              <span className="text-white">{aiPrediction.modelVersion}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Last Inferred:</span>
-              <span className="text-white">{aiPrediction.lastInferenceAt}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Inference Latency:</span>
-              <span className="text-white">18ms on local CPU</span>
-            </div>
-            <div className="flex justify-between">
-              <span>API Gateway:</span>
-              <span className="text-white">GET/POST /ai/predict-risk</span>
-            </div>
-          </div>
-        </div>
-      </div>
         </>
       )}
+    </div>
+  );
+}
+
+function MetricPanel({
+  label,
+  value,
+  delta,
+  suffix,
+  description,
+}: {
+  label: string;
+  value: string;
+  delta: number;
+  suffix: string;
+  description: string;
+}) {
+  const isHigh = Math.abs(delta) > 0.3;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="my-1.5 flex flex-wrap items-baseline gap-2">
+        <span className="font-mono text-xl font-bold text-slate-900">{value}</span>
+        <span className={`text-xs font-bold ${isHigh ? 'text-amber-600' : 'text-emerald-600'}`}>
+          {delta >= 0 ? '+' : ''}
+          {delta} {suffix}
+        </span>
+      </div>
+      <div className="text-[11px] leading-relaxed text-slate-500">{description}</div>
+    </div>
+  );
+}
+
+function InsightPanel({
+  tone,
+  title,
+  body,
+}: {
+  tone: 'success' | 'warning' | 'neutral';
+  title: string;
+  body: string;
+}) {
+  const toneClass =
+    tone === 'success'
+      ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
+      : tone === 'warning'
+      ? 'border-amber-100 bg-amber-50 text-amber-800'
+      : 'border-slate-200 bg-slate-50 text-slate-800';
+
+  return (
+    <div className={`rounded-2xl border p-3 ${toneClass}`}>
+      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide">
+        {tone === 'success' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+        {title}
+      </div>
+      <p className="mt-1 text-xs leading-relaxed opacity-80">{body}</p>
+    </div>
+  );
+}
+
+function ForecastPanel({
+  icon,
+  title,
+  value,
+  body,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  body: string;
+}) {
+  return (
+    <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="flex items-center gap-1.5 font-bold text-slate-800">
+          {icon}
+          {title}
+        </span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">{value}</span>
+      </div>
+      <p className="text-xs leading-relaxed text-slate-500">{body}</p>
+    </div>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span>{label}</span>
+      <span className="truncate text-right font-bold text-slate-900">{value}</span>
     </div>
   );
 }

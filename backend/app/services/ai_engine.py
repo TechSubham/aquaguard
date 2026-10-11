@@ -1,11 +1,14 @@
 import os
 import json
 import math
+import warnings
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 import joblib
 import numpy as np
 import pandas as pd
+
+warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 # Paths to model directory
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -96,6 +99,20 @@ class AIEngine:
                     ano_cfg = self.manifest.get("sensor_anomaly", {})
                     self.thresholds["anomaly"] = float(ano_cfg.get("xgboost_threshold", 0.815))
 
+            det_threshold_path = os.path.join(self.models_dir, "deterioration_thresholds_v2.json")
+            if os.path.exists(det_threshold_path):
+                with open(det_threshold_path, "r", encoding="utf-8") as f:
+                    det_thresholds = json.load(f)
+                    self.thresholds["2h"] = float(det_thresholds.get("2h", self.thresholds["2h"]))
+                    self.thresholds["4h"] = float(det_thresholds.get("4h", self.thresholds["4h"]))
+                    self.thresholds["6h"] = float(det_thresholds.get("6h", self.thresholds["6h"]))
+
+            anomaly_threshold_path = os.path.join(self.models_dir, "anomaly_xgb_threshold_v2.json")
+            if os.path.exists(anomaly_threshold_path):
+                with open(anomaly_threshold_path, "r", encoding="utf-8") as f:
+                    anomaly_threshold = json.load(f)
+                    self.thresholds["anomaly"] = float(anomaly_threshold.get("threshold", self.thresholds["anomaly"]))
+
             # 3. XGBoost models
             model_files = {
                 "det_2h": "xgb_deterioration_2h_v2.joblib",
@@ -119,7 +136,7 @@ class AIEngine:
     @property
     def inference_backend(self) -> str:
         """Reports whether inference uses trained artifacts or calibrated rules."""
-        expected = {"det_2h", "det_4h", "det_6h", "anomaly"}
+        expected = {"det_2h", "det_4h", "anomaly"}
         loaded = set(self.models.keys())
         if expected.issubset(loaded):
             return "xgboost_artifacts"
@@ -229,6 +246,215 @@ class AIEngine:
         resampled[-1] = curr
         return resampled
 
+    def _normalize_live_history(self, history: List[Dict[str, Any]]) -> pd.DataFrame:
+        """Convert API/DB reading dictionaries into the V2 training-time column shape."""
+        rows = []
+        for item in history:
+            row = {
+                "timestamp": item.get("timestamp") or item.get("recorded_at") or datetime.utcnow().isoformat(),
+                "ph": float(item.get("ph") if item.get("ph") is not None else self.baselines["ph"]),
+                "tds": float(item.get("tds") if item.get("tds") is not None else self.baselines["tds"]),
+                "turbidity": float(item.get("turbidity") if item.get("turbidity") is not None else self.baselines["turbidity"]),
+                "temperature": float(item.get("temperature") if item.get("temperature") is not None else self.baselines["temperature"]),
+                "water_level": float(item.get("water_level") if item.get("water_level") is not None else self.baselines["water_level"]),
+                "flow_rate": float(item.get("flow_rate") if item.get("flow_rate") is not None else self.baselines["flow_rate"]),
+            }
+            rows.append(row)
+
+        return pd.DataFrame(rows)
+
+    def build_v2_features(self, history: List[Dict[str, Any]] | pd.DataFrame) -> pd.DataFrame:
+        """
+        Reproduce the V2 training-time feature engineering for one tank.
+
+        The first 12 readings form the tank baseline; prediction becomes valid on
+        reading 13, when all 60-minute lag features are available.
+        """
+        if isinstance(history, pd.DataFrame):
+            data = history.copy()
+        else:
+            data = self._normalize_live_history(history)
+
+        keys = ["ph", "tds", "turbidity", "temperature", "water_level", "flow_rate"]
+        data["timestamp"] = pd.to_datetime(data["timestamp"])
+        data = data.sort_values("timestamp").reset_index(drop=True)
+        data["scenario_id"] = 1
+        grouped = data.groupby("scenario_id", group_keys=False)
+
+        lag_steps = {
+            "5m": 1,
+            "15m": 3,
+            "30m": 6,
+            "60m": 12,
+        }
+
+        for sensor in keys:
+            for label, steps in lag_steps.items():
+                data[f"{sensor}_change_{label}"] = grouped[sensor].diff(steps)
+
+        for sensor in keys:
+            data[f"{sensor}_abs_jump_5m"] = data[f"{sensor}_change_5m"].abs()
+
+        windows = {
+            "15m": 3,
+            "30m": 6,
+            "60m": 12,
+        }
+
+        for sensor in keys:
+            for label, window in windows.items():
+                rolling = grouped[sensor].rolling(window, min_periods=window)
+                data[f"{sensor}_mean_{label}"] = rolling.mean().reset_index(level=0, drop=True)
+                data[f"{sensor}_std_{label}"] = rolling.std().reset_index(level=0, drop=True)
+                data[f"{sensor}_min_{label}"] = rolling.min().reset_index(level=0, drop=True)
+                data[f"{sensor}_max_{label}"] = rolling.max().reset_index(level=0, drop=True)
+                data[f"{sensor}_range_{label}"] = data[f"{sensor}_max_{label}"] - data[f"{sensor}_min_{label}"]
+
+        for sensor in keys:
+            data[f"{sensor}_slope_30m"] = data[f"{sensor}_change_30m"] / 6.0
+            data[f"{sensor}_slope_60m"] = data[f"{sensor}_change_60m"] / 12.0
+
+        baseline = data.iloc[:12][keys].mean()
+        for sensor in keys:
+            data[f"{sensor}_baseline_deviation"] = data[sensor] - baseline[sensor]
+            data[f"{sensor}_baseline_abs_deviation"] = data[f"{sensor}_baseline_deviation"].abs()
+
+        for sensor in keys:
+            previous = grouped[sensor].shift(1)
+            prev_median = (
+                previous
+                .groupby(data["scenario_id"])
+                .rolling(6, min_periods=6)
+                .median()
+                .reset_index(level=0, drop=True)
+            )
+
+            data[f"{sensor}_prev_median_30m"] = prev_median
+            data[f"{sensor}_dev_prev_median_30m"] = data[sensor] - prev_median
+            data[f"{sensor}_abs_dev_prev_median_30m"] = data[f"{sensor}_dev_prev_median_30m"].abs()
+
+            abs_dev = (previous - prev_median).abs()
+            previous_mad = (
+                abs_dev
+                .groupby(data["scenario_id"])
+                .rolling(6, min_periods=6)
+                .median()
+                .reset_index(level=0, drop=True)
+            )
+
+            data[f"{sensor}_prev_mad_30m"] = previous_mad
+            denominator = 1.4826 * previous_mad + 1e-6
+            data[f"{sensor}_robust_z_30m"] = (
+                data[f"{sensor}_dev_prev_median_30m"].abs() / denominator
+            ).clip(0, 1000)
+
+        data["ph_distance_from_7"] = (data["ph"] - 7.0).abs()
+        data["tds_x_turbidity"] = data["tds"] * data["turbidity"]
+        data["tds_per_flow"] = data["tds"] / (data["flow_rate"].abs() + 0.1)
+        data["turbidity_per_flow"] = data["turbidity"] / (data["flow_rate"].abs() + 0.1)
+        data["level_x_flow"] = data["water_level"] * data["flow_rate"]
+
+        return data
+
+    def build_live_explanation(self, row: pd.Series) -> List[str]:
+        reasons = []
+
+        if row["tds_change_30m"] > 30:
+            reasons.append("TDS is increasing rapidly.")
+
+        if row["turbidity_change_30m"] > 0.5:
+            reasons.append("Turbidity is increasing.")
+
+        if abs(row["ph_change_30m"]) > 0.25:
+            reasons.append("pH is drifting from its recent level.")
+
+        if row["flow_rate_change_30m"] < -0.3:
+            reasons.append("Flow rate is decreasing.")
+
+        if not reasons:
+            reasons.append("No major adverse trend detected.")
+
+        return reasons
+
+    def predict_from_history(self, history: List[Dict[str, Any]] | pd.DataFrame) -> Dict[str, Any]:
+        """Small live inference API for Wokwi/frontend polling."""
+        reading_count = len(history)
+        if reading_count < 13:
+            return {
+                "ready": False,
+                "status": "CALIBRATING",
+                "readings_collected": reading_count,
+                "readings_required": 13,
+                "baseline_readings_required": 12,
+            }
+
+        engineered = self.build_v2_features(history)
+        latest = engineered.iloc[[-1]].reset_index(drop=True)
+
+        missing_det = [feature for feature in self.det_features if feature not in latest.columns]
+        missing_anomaly = [feature for feature in self.ano_features if feature not in latest.columns]
+        if missing_det:
+            raise ValueError(f"Missing deterioration features: {missing_det}")
+        if missing_anomaly:
+            raise ValueError(f"Missing anomaly features: {missing_anomaly}")
+
+        risk_2h_raw = 0.15
+        risk_4h_raw = 0.20
+        anomaly_probability = 0.0
+
+        if "det_2h" in self.models:
+            risk_2h_raw = float(self.models["det_2h"].predict_proba(latest[self.det_features])[0, 1])
+        if "det_4h" in self.models:
+            risk_4h_raw = float(self.models["det_4h"].predict_proba(latest[self.det_features])[0, 1])
+        if "anomaly" in self.models:
+            anomaly_probability = float(self.models["anomaly"].predict_proba(latest[self.ano_features])[0, 1])
+
+        risk_2h = risk_2h_raw
+        risk_4h = max(risk_2h, risk_4h_raw)
+
+        warning_2h = risk_2h_raw >= self.thresholds["2h"]
+        warning_4h = risk_4h_raw >= self.thresholds["4h"]
+        sensor_anomaly = anomaly_probability >= self.thresholds["anomaly"]
+
+        if sensor_anomaly:
+            status = "SENSOR_FAULT"
+        elif warning_2h:
+            status = "HIGH"
+        elif warning_4h:
+            status = "MODERATE"
+        else:
+            status = "LOW"
+
+        explanation = self.build_live_explanation(engineered.iloc[-1])
+
+        return {
+            "ready": True,
+            "status": status,
+            "risk": {
+                "2h": {
+                    "probability": round(risk_2h, 4),
+                    "percentage": round(risk_2h * 100, 1),
+                    "warning": bool(warning_2h),
+                },
+                "4h": {
+                    "probability": round(risk_4h, 4),
+                    "percentage": round(risk_4h * 100, 1),
+                    "warning": bool(warning_4h),
+                },
+            },
+            "sensor_health": {
+                "anomaly": bool(sensor_anomaly),
+                "anomaly_probability": round(anomaly_probability, 4),
+            },
+            "explanation": explanation,
+            "inference_backend": self.inference_backend,
+            "models_loaded": sorted(self.models.keys()),
+            "safety_statement": self.manifest.get(
+                "safety_statement",
+                "Predictions represent deterioration risk in monitored sensor indicators and sensor-behaviour anomalies. They do not certify drinking-water safety.",
+            ),
+        }
+
     def compute_24h_summary(self, readings_288: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Capability: 24-Hour Macro Trend & Baseline Analysis.
@@ -291,6 +517,30 @@ class AIEngine:
         Extract the exact 185 deterioration features and 72 anomaly features
         matching training pipeline schemas.
         """
+        combined_history = list(history or [])
+        if not combined_history:
+            combined_history = [current_reading]
+        else:
+            latest = combined_history[-1]
+            latest_time = latest.get("timestamp") or latest.get("recorded_at")
+            current_time = current_reading.get("timestamp") or current_reading.get("recorded_at")
+            values_match = all(
+                abs(float(latest.get(k, self.baselines[k]) or self.baselines[k]) - float(current_reading.get(k, self.baselines[k]) or self.baselines[k])) < 1e-6
+                for k in ["ph", "tds", "turbidity", "temperature", "water_level", "flow_rate"]
+            )
+            if current_time and latest_time:
+                should_append_current = current_time != latest_time
+            else:
+                should_append_current = not values_match
+
+            if should_append_current:
+                combined_history.append(current_reading)
+
+        if len(combined_history) >= 13 and self.det_features and self.ano_features:
+            engineered = self.build_v2_features(combined_history)
+            latest = engineered.iloc[[-1]].reset_index(drop=True)
+            return latest[self.det_features], latest[self.ano_features]
+
         base = baseline or self.baselines
         readings = self._ensure_history_window(history, current_reading)
         

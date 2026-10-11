@@ -28,9 +28,6 @@ export interface Tank {
   lastUpdated: string;
   lastServiceDate: string;
   nextServiceDate: string;
-  maintenanceStatus: 'GOOD' | 'DUE_SOON' | 'OVERDUE';
-  maintenanceType: string;
-  aiMaintenanceRisk: number;
 }
 
 export interface SensorReading {
@@ -160,12 +157,6 @@ export interface AIPredictionData {
     anomaly_type?: string;
   };
   abnormalPatternDetected?: boolean;
-  maintenancePrediction?: {
-    maintenance_risk_percent?: number;
-    maintenance_window?: string;
-    recommendation?: string;
-    days_since_last_service?: number;
-  };
   leakagePrediction?: {
     detected?: boolean;
     confidence_percent?: number;
@@ -192,22 +183,6 @@ export interface Complaint {
   submittedAt: string;
   clusterCount?: number;
   adminNotes?: string;
-}
-
-export interface WaterTestReport {
-  id: string;
-  tankId: string;
-  testDate: string;
-  laboratory: string;
-  ph: number;
-  tds: number;
-  turbidity: number;
-  eColi: 'NEGATIVE' | 'POSITIVE';
-  coliform: 'NEGATIVE' | 'POSITIVE';
-  certifiedBy: string;
-  reportNumber: string;
-  status: 'PASSED' | 'FAILED';
-  notes: string;
 }
 
 export type IncidentStage = 'DETECTED' | 'INVESTIGATING' | 'ACTION_TAKEN' | 'TESTING' | 'RESOLVED';

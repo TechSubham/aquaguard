@@ -9,7 +9,6 @@ import {
   AlertItem,
   AIPredictionData,
   Complaint,
-  WaterTestReport,
   Incident,
   IncidentStage,
   UserSession,
@@ -21,7 +20,6 @@ import {
   INITIAL_ALERTS,
   INITIAL_AI_PREDICTION,
   INITIAL_COMPLAINTS,
-  INITIAL_WATER_TESTS,
   INITIAL_INCIDENT,
   generateHistoricalReadings,
   MOCK_TELEMETRY_ANCHOR_ISO,
@@ -35,8 +33,6 @@ import {
   fetchComplaintsApi,
   createComplaintApi,
   updateComplaintStatusApi,
-  fetchWaterTestsApi,
-  createWaterTestApi,
   fetchIncidentsApi,
   updateIncidentStageApi,
   updateAlertStatusApi,
@@ -64,7 +60,6 @@ interface AquaGuardContextType {
   alerts: AlertItem[];
   aiPrediction: AIPredictionData;
   complaints: Complaint[];
-  waterTests: WaterTestReport[];
   incident: Incident;
   isLiveUpdating: boolean;
   setIsLiveUpdating: (val: boolean) => void;
@@ -72,12 +67,10 @@ interface AquaGuardContextType {
   refreshData: () => Promise<void>;
   refreshComplaints: () => Promise<void>;
   runAIInference: () => Promise<AIPredictionData>;
-  resolveAlert: (id: string) => void;
-  investigateAlert: (id: string) => void;
+  resolveAlert: (id: string) => Promise<boolean>;
+  investigateAlert: (id: string) => Promise<boolean>;
   addComplaint: (complaint: Omit<Complaint, 'id' | 'submittedAt' | 'status'>) => void;
   updateComplaintStatus: (id: string, status: Complaint['status'], adminNotes?: string) => Promise<boolean>;
-  addWaterTest: (test: Omit<WaterTestReport, 'id' | 'reportNumber'>) => void;
-  markMaintenanceComplete: (tankId: string) => void;
   advanceIncidentStage: (stage: IncidentStage, note: string) => void;
 }
 
@@ -104,7 +97,6 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
   const [alerts, setAlerts] = useState<AlertItem[]>(INITIAL_ALERTS);
   const [aiPrediction, setAiPrediction] = useState<AIPredictionData>(INITIAL_AI_PREDICTION);
   const [complaints, setComplaints] = useState<Complaint[]>(INITIAL_COMPLAINTS);
-  const [waterTests, setWaterTests] = useState<WaterTestReport[]>(INITIAL_WATER_TESTS);
   const [incident, setIncident] = useState<Incident>(INITIAL_INCIDENT);
   const [isLiveUpdating, setIsLiveUpdating] = useState<boolean>(true);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(
@@ -194,6 +186,15 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshAlerts = useCallback(async () => {
+    try {
+      const backendAlerts = await fetchAlertsApi();
+      setAlerts(backendAlerts);
+    } catch (err) {
+      console.warn('Failed to refresh alerts:', err);
+    }
+  }, []);
+
   // Polling loop
   useEffect(() => {
     const syncLiveData = () => {
@@ -248,12 +249,11 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function loadBackendData() {
       try {
-        const [backendTanks, backendHostels, backendAlerts, backendComplaints, backendWaterTests, backendIncident] = await Promise.all([
+        const [backendTanks, backendHostels, backendAlerts, backendComplaints, backendIncident] = await Promise.all([
           fetchTanks(),
           fetchHostelsApi(),
           fetchAlertsApi(),
           fetchComplaintsApi(),
-          fetchWaterTestsApi(),
           fetchIncidentsApi(),
         ]);
         if (backendTanks && backendTanks.length > 0) {
@@ -271,7 +271,6 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
         }
         if (backendAlerts && backendAlerts.length > 0) setAlerts(backendAlerts);
         if (backendComplaints && backendComplaints.length > 0) setComplaints(backendComplaints);
-        if (backendWaterTests && backendWaterTests.length > 0) setWaterTests(backendWaterTests);
         if (backendIncident) setIncident(backendIncident);
       } catch (err) {
         console.warn('Initial backend sync failed, running on resilient local cache:', err);
@@ -280,25 +279,40 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
     loadBackendData();
   }, []);
 
-  const resolveAlert = (id: string) => {
+  const updateAlertStatus = useCallback(async (id: string, status: AlertItem['status']): Promise<boolean> => {
+    const previousAlerts = alerts;
     setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'RESOLVED', severity: 'RESOLVED' } : a))
+      prev.map((a) => (
+        a.id === id
+          ? {
+              ...a,
+              status,
+              severity: status === 'RESOLVED' ? 'RESOLVED' : a.severity,
+            }
+          : a
+      ))
     );
-    const numId = parseInt(id.replace('ALT-', ''), 10);
-    if (!isNaN(numId)) {
-      updateAlertStatusApi(numId, 'RESOLVED');
-    }
-  };
 
-  const investigateAlert = (id: string) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'INVESTIGATING' } : a))
-    );
     const numId = parseInt(id.replace('ALT-', ''), 10);
     if (!isNaN(numId)) {
-      updateAlertStatusApi(numId, 'INVESTIGATING');
+      const didPersist = await updateAlertStatusApi(numId, status);
+      if (!didPersist) {
+        setAlerts(previousAlerts);
+        console.warn(`Failed to persist alert ${id} status update to ${status}`);
+        return false;
+      }
+      await refreshAlerts();
     }
-  };
+    return true;
+  }, [alerts, refreshAlerts]);
+
+  const resolveAlert = useCallback((id: string) => {
+    return updateAlertStatus(id, 'RESOLVED');
+  }, [updateAlertStatus]);
+
+  const investigateAlert = useCallback((id: string) => {
+    return updateAlertStatus(id, 'INVESTIGATING');
+  }, [updateAlertStatus]);
 
   const addComplaint = (newComp: Omit<Complaint, 'id' | 'submittedAt' | 'status'>) => {
     const id = `#${105 + complaints.length}`;
@@ -333,44 +347,6 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
       await refreshComplaints();
     }
     return true;
-  };
-
-  const addWaterTest = (testData: Omit<WaterTestReport, 'id' | 'reportNumber'>) => {
-    const reportNum = `AQUA-CERT-NSUT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newReport: WaterTestReport = {
-      ...testData,
-      id: `LAB-2026-${Math.floor(100 + Math.random() * 900)}`,
-      reportNumber: reportNum,
-    };
-    setWaterTests((prev) => [newReport, ...prev]);
-
-    // Find numeric tank id if possible
-    createWaterTestApi({
-      tank_id: 2, // Default to A2-ROOF-01 in postgres
-      tested_by: testData.certifiedBy,
-      ph: testData.ph,
-      tds: testData.tds,
-      turbidity: testData.turbidity,
-      ecoli_result: testData.eColi,
-      coliform_result: testData.coliform,
-      notes: testData.notes,
-    });
-  };
-
-  const markMaintenanceComplete = (tankId: string) => {
-    setTanks((prev) =>
-      prev.map((t) =>
-        t.id === tankId
-          ? {
-              ...t,
-              maintenanceStatus: 'GOOD',
-              lastServiceDate: 'Today',
-              nextServiceDate: '08 Nov 2026',
-              aiMaintenanceRisk: 10,
-            }
-          : t
-      )
-    );
   };
 
   const advanceIncidentStage = (stage: IncidentStage, note: string) => {
@@ -412,7 +388,6 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
         alerts,
         aiPrediction,
         complaints,
-        waterTests,
         incident,
         isLiveUpdating,
         setIsLiveUpdating,
@@ -424,8 +399,6 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
         investigateAlert,
         addComplaint,
         updateComplaintStatus,
-        addWaterTest,
-        markMaintenanceComplete,
         advanceIncidentStage,
       }}
     >

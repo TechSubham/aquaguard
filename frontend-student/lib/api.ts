@@ -23,6 +23,13 @@ import {
 } from './mockData';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_FALLBACK_BASE = process.env.NEXT_PUBLIC_API_FALLBACK_URL || 'http://localhost:8001';
+const API_BASE_CANDIDATES = Array.from(new Set([API_BASE, API_FALLBACK_BASE].filter(Boolean)));
+
+function getAdminToken(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem('aquaguard_admin_token') || localStorage.getItem('aquaguard_token') || '';
+}
 
 type BackendTank = {
   tank_code: string;
@@ -39,6 +46,55 @@ type TankStatusResponse = {
   last_reading?: string | null;
 };
 
+type LivePredictionResponse = {
+  tank_id?: string;
+  ready?: boolean;
+  status?: string;
+  readings_collected?: number;
+  readings_required?: number;
+  baseline_readings_required?: number;
+  risk?: {
+    '2h'?: { probability?: number; percentage?: number; warning?: boolean };
+    '4h'?: { probability?: number; percentage?: number; warning?: boolean };
+  };
+  sensor_health?: {
+    anomaly?: boolean;
+    anomaly_probability?: number;
+  };
+  explanation?: string[];
+  inference_backend?: string;
+  models_loaded?: string[];
+  safety_statement?: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
+function asRecordArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((item) => item && typeof item === 'object').map((item) => item as Record<string, unknown>)
+    : [];
+}
+
+function asLivePrediction(value: unknown): LivePredictionResponse | null {
+  return value && typeof value === 'object' ? value as LivePredictionResponse : null;
+}
+
+async function fetchJsonFromCandidates(path: string, init?: RequestInit): Promise<unknown | null> {
+  for (const base of API_BASE_CANDIDATES) {
+    try {
+      const res = await fetch(`${base}${path}`, init);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Try the next configured backend URL.
+    }
+  }
+  return null;
+}
+
 function riskStatusFromScore(score: number): Tank['riskStatus'] {
   if (score >= 80) return 'CRITICAL';
   if (score >= 50) return 'HIGH';
@@ -46,10 +102,153 @@ function riskStatusFromScore(score: number): Tank['riskStatus'] {
   return 'NORMAL';
 }
 
+function mapLiveReading(item: unknown, tankCode: string): SensorReading {
+  const record = asRecord(item);
+  const recordedAt = typeof record.timestamp === 'string'
+    ? record.timestamp
+    : typeof record.recorded_at === 'string'
+    ? record.recorded_at
+    : new Date().toISOString();
+
+  return {
+    tank_id: typeof record.tank_id === 'string' ? record.tank_id : tankCode,
+    recorded_at: recordedAt,
+    temperature: Number(record.temperature ?? 25),
+    ph: Number(record.ph ?? 7.0),
+    tds: Number(record.tds ?? 300),
+    turbidity: Number(record.turbidity ?? 1.0),
+    water_level: Number(record.water_level ?? 80),
+    flow_rate: Number(record.flow_rate ?? 3.5),
+    risk_score: Number(record.risk_score ?? 20),
+    ai_risk_probability: Number(record.ai_risk_probability ?? 0.15),
+  };
+}
+
+function normalizeRiskLevel(status: string | undefined, fallbackPercent: number): AIPredictionData['riskLevel'] {
+  if (status === 'SENSOR_FAULT') return 'HIGH';
+  if (status === 'HIGH' || status === 'MODERATE' || status === 'LOW' || status === 'CRITICAL') {
+    return status;
+  }
+  if (fallbackPercent >= 80) return 'CRITICAL';
+  if (fallbackPercent >= 50) return 'HIGH';
+  if (fallbackPercent >= 30) return 'MODERATE';
+  return 'LOW';
+}
+
+function mapLiveAIPrediction(data: LivePredictionResponse, tankCode: string): AIPredictionData {
+  if (data.status === 'NO_DATA') {
+    return {
+      status: 'offline',
+      message: 'No live AI readings have been received for this tank yet.',
+      tankId: tankCode,
+      currentRiskPercent: 0,
+      riskLevel: 'LOW',
+      futureProjections: [],
+      predictionSummary: 'Waiting for Wokwi or IoT telemetry.',
+      rootCauses: [],
+      possibleCauses: [],
+      recommendedActions: ['Start Wokwi telemetry or post readings to /sensor-reading.'],
+      lastInferenceAt: 'No live inference yet',
+      modelVersion: 'v2.0-XGBoost Live',
+    };
+  }
+
+  if (!data.ready) {
+    const collected = Number(data.readings_collected ?? 0);
+    const required = Number(data.readings_required ?? 13);
+    return {
+      status: 'online',
+      tankId: data.tank_id || tankCode,
+      currentRiskPercent: 0,
+      riskLevel: 'LOW',
+      riskProbability: 0,
+      predictionHorizonHours: 4,
+      historyWindowHours: 1,
+      historyPointsCount: collected,
+      futureProjections: [
+        { timeOffset: 'Now', riskPercent: 0 },
+        { timeOffset: '+2 hrs', riskPercent: 0 },
+        { timeOffset: '+4 hrs', riskPercent: 0 },
+      ],
+      predictionSummary: `AI calibration in progress: ${collected}/${required} five-minute readings collected.`,
+      rootCauses: [
+        {
+          factor: 'Baseline calibration',
+          trend: 'stable',
+          detail: 'The first 12 readings establish this tank baseline before XGBoost inference starts.',
+          contribution: 0,
+        },
+      ],
+      possibleCauses: [],
+      recommendedActions: ['Continue collecting simulated five-minute readings until calibration completes.'],
+      lastInferenceAt: 'Calibrating',
+      modelVersion: 'v2.0-XGBoost Live',
+      anomalyDetected: false,
+      safetyStatement: data.safety_statement,
+    };
+  }
+
+  const risk2h = Number(data.risk?.['2h']?.percentage ?? 0);
+  const risk4h = Number(data.risk?.['4h']?.percentage ?? risk2h);
+  const currentRiskPercent = Math.round(Math.max(risk2h, risk4h));
+  const explanation = data.explanation?.length ? data.explanation : ['No major adverse trend detected.'];
+
+  return {
+    status: 'online',
+    tankId: data.tank_id || tankCode,
+    currentRiskPercent,
+    riskLevel: normalizeRiskLevel(data.status, currentRiskPercent),
+    riskProbability: Number((Math.max(risk2h, risk4h) / 100).toFixed(4)),
+    predictionHorizonHours: 4,
+    historyWindowHours: 1,
+    futureProjections: [
+      { timeOffset: 'Now', riskPercent: Math.round(risk2h) },
+      { timeOffset: '+2 hrs', riskPercent: Math.round(risk2h) },
+      { timeOffset: '+4 hrs', riskPercent: Math.round(risk4h) },
+      { timeOffset: '+6 hrs', riskPercent: Math.round(risk4h) },
+    ],
+    predictionSummary: data.status === 'SENSOR_FAULT'
+      ? 'Live model detected sensor-behaviour anomaly. Verify probes before acting on water-quality trends.'
+      : `Live XGBoost inference reports ${data.status || 'LOW'} deterioration risk from recent telemetry.`,
+    rootCauses: explanation.map((detail, index) => ({
+      factor: index === 0 ? 'Live telemetry trend' : 'Supporting signal',
+      trend: detail.toLowerCase().includes('decreasing') ? 'down' : detail.toLowerCase().includes('no major') ? 'stable' : 'up',
+      detail,
+      contribution: index === 0 ? 0.7 : 0.4,
+    })),
+    possibleCauses: explanation.map((detail) => ({
+      cause: detail.replace(/\.$/, ''),
+      confidencePercent: data.status === 'LOW' ? 35 : 70,
+      notes: 'Generated from the live V2 feature-engineering explanation layer.',
+    })),
+    recommendedActions: data.status === 'LOW'
+      ? ['1. Continue automated telemetry monitoring', '2. Keep collecting five-minute AI snapshots']
+      : ['1. Inspect current tank telemetry trend', '2. Cross-check sensor probes', '3. Collect a manual water-quality sample if trend persists'],
+    lastInferenceAt: 'Just now',
+    modelVersion: `v2.0-XGBoost Live (${data.inference_backend || 'xgboost_artifacts'})`,
+    anomalyDetected: Boolean(data.sensor_health?.anomaly),
+    anomalyDetails: {
+      anomaly_probability: Number(data.sensor_health?.anomaly_probability ?? 0),
+      anomaly_type: data.sensor_health?.anomaly ? 'SENSOR_FAULT' : 'NOMINAL',
+      message: data.sensor_health?.anomaly ? 'Sensor anomaly threshold crossed.' : 'Sensor telemetry behavior normal',
+    },
+    abnormalPatternDetected: data.status === 'HIGH' || data.status === 'MODERATE',
+    safetyStatement: data.safety_statement,
+  };
+}
+
 // ----------------------------------------------------
 // 1. Telemetry Readings
 // ----------------------------------------------------
 export async function fetchLatestReading(tankCode: string): Promise<SensorReading> {
+  const liveHistory = asRecordArray(await fetchJsonFromCandidates(`/history/${tankCode}`, {
+    cache: 'no-store',
+    headers: { 'Accept': 'application/json' },
+  }));
+  if (Array.isArray(liveHistory) && liveHistory.length > 0) {
+    return mapLiveReading(liveHistory[liveHistory.length - 1], tankCode);
+  }
+
   try {
     const res = await fetch(`${API_BASE}/readings/latest/${tankCode}`, {
       cache: 'no-store',
@@ -95,6 +294,14 @@ export async function fetchLatestReading(tankCode: string): Promise<SensorReadin
 }
 
 export async function fetchReadingHistory(tankCode: string, limit: number = 24): Promise<SensorReading[]> {
+  const liveHistory = asRecordArray(await fetchJsonFromCandidates(`/history/${tankCode}`, {
+    cache: 'no-store',
+    headers: { 'Accept': 'application/json' },
+  }));
+  if (Array.isArray(liveHistory) && liveHistory.length > 0) {
+    return liveHistory.slice(-limit).map((item) => mapLiveReading(item, tankCode));
+  }
+
   try {
     const res = await fetch(`${API_BASE}/readings/history/${tankCode}?limit=${limit}`, {
       cache: 'no-store',
@@ -218,46 +425,68 @@ export async function fetchTankStatus(tankCode: string): Promise<TankStatusRespo
 // 3. Alerts API
 // ----------------------------------------------------
 export async function fetchAlertsApi(): Promise<AlertItem[]> {
-  try {
-    const res = await fetch(`${API_BASE}/alerts`, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/json' },
-    });
-    if (res.ok) {
+  for (const base of API_BASE_CANDIDATES) {
+    try {
+      const res = await fetch(`${base}/alerts`, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+      });
+      if (!res.ok) continue;
+
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return data.map((a: any) => ({
+      if (!Array.isArray(data)) continue;
+
+      return data.map((item: unknown) => {
+        const a = asRecord(item);
+        const severity = String(a.severity ?? '');
+        const status = String(a.status ?? '');
+        const tankCode = String(a.tank_code ?? 'A2-ROOF-01');
+
+        return {
           id: `ALT-${a.id}`,
-          severity: a.severity === 'CRITICAL' ? 'CRITICAL' : a.severity === 'WARNING' ? 'WARNING' : 'PREDICTIVE',
-          title: a.title,
-          tankId: a.tank_code,
-          tankName: `${a.tank_code} Main`,
-          description: a.message,
-          riskScore: a.severity === 'CRITICAL' ? 90 : 65,
-          timestamp: a.created_at ? new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '10:41 PM',
+          severity: severity === 'CRITICAL' ? 'CRITICAL' : severity === 'WARNING' ? 'WARNING' : 'PREDICTIVE',
+          title: String(a.title ?? 'Water Quality Event'),
+          tankId: tankCode,
+          tankName: `${tankCode} Main`,
+          description: String(a.message ?? ''),
+          riskScore: severity === 'CRITICAL' ? 90 : 65,
+          timestamp: typeof a.created_at === 'string'
+            ? new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '10:41 PM',
           metricsSummary: { turbidity: 6.88, tds: 486, ph: 6.39 },
-          status: a.status === 'RESOLVED' ? 'RESOLVED' : a.status === 'INVESTIGATING' ? 'INVESTIGATING' : 'OPEN',
+          status: status === 'RESOLVED' ? 'RESOLVED' : status === 'INVESTIGATING' ? 'INVESTIGATING' : 'OPEN',
           isPredictive: a.type === 'PREDICTIVE',
-        }));
-      }
+        };
+      });
+    } catch {
+      // Try the next configured backend URL.
     }
-  } catch {
-    // Offline fallback
   }
+
   return INITIAL_ALERTS;
 }
 
 export async function updateAlertStatusApi(alertIdNum: number, status: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/alerts/${alertIdNum}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    return res.ok;
-  } catch {
-    return false;
+  const token = getAdminToken();
+
+  for (const base of API_BASE_CANDIDATES) {
+    try {
+      const res = await fetch(`${base}/alerts/${alertIdNum}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': 'admin',
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) return true;
+    } catch {
+      // Try the next configured backend URL.
+    }
   }
+
+  return false;
 }
 
 // ----------------------------------------------------
@@ -530,13 +759,20 @@ function mapBackendAIPrediction(data: any): AIPredictionData {
 }
 
 export async function fetchAIPrediction(tankCode: string): Promise<AIPredictionData> {
+  const livePrediction = asLivePrediction(await fetchJsonFromCandidates(`/prediction/${tankCode}`, {
+    cache: 'no-store',
+    headers: { 'Accept': 'application/json' },
+  }));
+  if (livePrediction && livePrediction.status !== 'NO_DATA') {
+    return mapLiveAIPrediction(livePrediction, tankCode);
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/ai/predict-risk/${tankCode}`, {
+    const data = await fetchJsonFromCandidates(`/ai/predict-risk/${tankCode}`, {
       cache: 'no-store',
       headers: { 'Accept': 'application/json' },
     });
-    if (res.ok) {
-      const data = await res.json();
+    if (data) {
       return mapBackendAIPrediction(data);
     }
   } catch (e) {
@@ -546,20 +782,46 @@ export async function fetchAIPrediction(tankCode: string): Promise<AIPredictionD
 }
 
 export async function triggerAIInference(tankCode: string, payload?: any): Promise<AIPredictionData> {
+  if (!payload) {
+    const livePrediction = asLivePrediction(await fetchJsonFromCandidates(`/prediction/${tankCode}`, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+    }));
+    if (livePrediction && livePrediction.status !== 'NO_DATA') {
+      return mapLiveAIPrediction(livePrediction, tankCode);
+    }
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/ai/predict-risk`, {
+    const data = await fetchJsonFromCandidates(`/ai/predict-risk`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(payload || { tank_id: tankCode }),
     });
-    if (res.ok) {
-      const data = await res.json();
+    if (data) {
       return mapBackendAIPrediction(data);
     }
   } catch (e) {
     console.warn('Backend AI inference trigger failed:', e);
   }
   return fetchAIPrediction(tankCode);
+}
+
+export async function resetLivePredictionApi(tankCode: string): Promise<boolean> {
+  for (const base of API_BASE_CANDIDATES) {
+    try {
+      const res = await fetch(`${base}/reset/${tankCode}`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+      });
+      if (res.ok) {
+        return true;
+      }
+    } catch {
+      // Try the next configured backend URL.
+    }
+  }
+  return false;
 }
 
 export async function fetchFleetAIPredictions(): Promise<any> {

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Body
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -19,6 +20,25 @@ router = APIRouter(
     prefix="/ai",
     tags=["AI Predictive Intelligence"]
 )
+
+
+live_tank_history: Dict[str, List[Dict[str, Any]]] = {}
+latest_live_predictions: Dict[str, Dict[str, Any]] = {}
+
+
+class LiveSensorReading(BaseModel):
+    tank_id: str = "TANK_001"
+    ph: float
+    tds: float
+    turbidity: float
+    temperature: float
+    water_level: float
+    flow_rate: float
+    risk_score: float | None = None
+    firmware_version: str | None = None
+    sensor_source: str | None = None
+    simulation_time: float | None = None
+    timestamp: datetime | None = None
 
 
 def _sync_predictive_alerts(db: Session, tank: Tank, prediction: Dict[str, Any]):
@@ -146,10 +166,72 @@ def ai_health():
         "model_version": "v2.0-XGBoost-Ensemble",
         "supported_horizons": ["+2h", "+4h", "+6h"],
         "message": (
-            "All trained XGBoost artifacts loaded."
+            "Required trained XGBoost artifacts loaded."
             if trained_artifacts_loaded
             else "XGBoost artifact files are missing; predictions are running through the calibrated fallback engine."
         )
+    }
+
+
+@router.post("/sensor-reading")
+def ingest_live_sensor_reading(reading: LiveSensorReading):
+    """
+    Ingest one live Wokwi/IoT reading, keep recent in-memory history, and run
+    V2 model inference once the first 13 five-minute readings are available.
+    """
+    tank_id = reading.tank_id
+    if tank_id not in live_tank_history:
+        live_tank_history[tank_id] = []
+
+    record = reading.model_dump()
+    if record["timestamp"] is None:
+        record["timestamp"] = datetime.utcnow().isoformat()
+    elif isinstance(record["timestamp"], datetime):
+        record["timestamp"] = record["timestamp"].isoformat()
+
+    live_tank_history[tank_id].append(record)
+    live_tank_history[tank_id] = live_tank_history[tank_id][-300:]
+
+    prediction = ai_engine.predict_from_history(live_tank_history[tank_id])
+    latest_live_predictions[tank_id] = prediction
+
+    return {
+        "tank_id": tank_id,
+        "reading_count": len(live_tank_history[tank_id]),
+        "prediction": prediction,
+    }
+
+
+@router.get("/prediction/{tank_id}")
+def get_live_prediction(tank_id: str):
+    """Return the latest live prediction for a Wokwi/IoT-fed tank."""
+    if tank_id not in latest_live_predictions:
+        return {
+            "tank_id": tank_id,
+            "status": "NO_DATA",
+        }
+
+    return {
+        "tank_id": tank_id,
+        **latest_live_predictions[tank_id],
+    }
+
+
+@router.get("/live-history/{tank_id}")
+def get_live_history(tank_id: str):
+    """Return the in-memory live history used by the small Wokwi inference API."""
+    return live_tank_history.get(tank_id, [])
+
+
+@router.post("/reset/{tank_id}")
+def reset_live_tank(tank_id: str):
+    """Clear live inference history after maintenance or sensor recalibration."""
+    live_tank_history.pop(tank_id, None)
+    latest_live_predictions.pop(tank_id, None)
+
+    return {
+        "tank_id": tank_id,
+        "status": "RESET",
     }
 
 

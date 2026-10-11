@@ -158,7 +158,7 @@ def send_alert_email(to_email: str, subject: str, message: str) -> bool:
                                         <tr>
                                             <td>
                                                 <div style="display: inline-block; width: 44px; height: 44px; border-radius: 14px; background: rgba(255,255,255,0.14); text-align: center; line-height: 44px; color: #7dd3fc; font-weight: 900; font-size: 14px;">AG</div>
-                                                <div style="margin-top: 16px; color: #bae6fd; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;">AquaGuard NSUT</div>
+                                                <div style="margin-top: 16px; color: #bae6fd; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;">AquaGuard </div>
                                                 <h1 style="margin: 8px 0 0; color: #ffffff; font-size: 28px; line-height: 1.2; font-weight: 900;">{escape(theme["hero"])}</h1>
                                                 <p style="margin: 10px 0 0; color: #dbeafe; font-size: 14px; line-height: 1.6;">{safe_summary}</p>
                                             </td>
@@ -184,7 +184,7 @@ def send_alert_email(to_email: str, subject: str, message: str) -> bool:
                                         <strong style="color: #0f172a;">Subject:</strong> {safe_subject}
                                     </p>
                                     <p style="margin: 10px 0 0; color: #64748b; font-size: 12px; line-height: 1.6;">
-                                        This is an automated message from the NSUT AquaGuard Command Center. Please do not reply directly to this email.
+                                        This is an automated message from the AquaGuard Command Center. Please do not reply directly to this email.
                                     </p>
                                 </div>
                             </td>
@@ -206,7 +206,7 @@ def send_alert_email(to_email: str, subject: str, message: str) -> bool:
 
     {message}
 
-    This is an automated message from the NSUT AquaGuard Command Center.
+    This is an automated message from the  AquaGuard Command Center.
     Please do not reply directly to this email.
     """
 

@@ -41,7 +41,8 @@ import {
   updateIncidentStageApi,
   updateAlertStatusApi,
   fetchAIPrediction,
-  triggerAIInference
+  triggerAIInference,
+  resetLivePredictionApi
 } from './api';
 
 interface AquaGuardContextType {
@@ -69,8 +70,8 @@ interface AquaGuardContextType {
   lastRefreshTime: Date;
   refreshData: () => Promise<void>;
   runAIInference: () => Promise<AIPredictionData>;
-  resolveAlert: (id: string) => void;
-  investigateAlert: (id: string) => void;
+  resolveAlert: (id: string) => Promise<boolean>;
+  investigateAlert: (id: string) => Promise<boolean>;
   addComplaint: (complaint: Omit<Complaint, 'id' | 'submittedAt' | 'status'>) => void;
   updateComplaintStatus: (id: string, status: Complaint['status'], adminNotes?: string) => void;
   addWaterTest: (test: Omit<WaterTestReport, 'id' | 'reportNumber'>) => void;
@@ -222,6 +223,15 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedTankIdState, aiPrediction]);
 
+  const refreshAlerts = useCallback(async () => {
+    try {
+      const backendAlerts = await fetchAlertsApi();
+      setAlerts(backendAlerts);
+    } catch (err) {
+      console.warn('Failed to refresh alerts:', err);
+    }
+  }, []);
+
   // When selectedTankId changes, fetch live AI prediction from FastAPI backend
   useEffect(() => {
     let isMounted = true;
@@ -277,25 +287,40 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
     loadBackendData();
   }, []);
 
-  const resolveAlert = (id: string) => {
+  const updateAlertStatus = useCallback(async (id: string, status: AlertItem['status']): Promise<boolean> => {
+    const previousAlerts = alerts;
     setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'RESOLVED', severity: 'RESOLVED' } : a))
+      prev.map((a) => (
+        a.id === id
+          ? {
+              ...a,
+              status,
+              severity: status === 'RESOLVED' ? 'RESOLVED' : a.severity,
+            }
+          : a
+      ))
     );
-    const numId = parseInt(id.replace('ALT-', ''), 10);
-    if (!isNaN(numId)) {
-      updateAlertStatusApi(numId, 'RESOLVED');
-    }
-  };
 
-  const investigateAlert = (id: string) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'INVESTIGATING' } : a))
-    );
     const numId = parseInt(id.replace('ALT-', ''), 10);
     if (!isNaN(numId)) {
-      updateAlertStatusApi(numId, 'INVESTIGATING');
+      const didPersist = await updateAlertStatusApi(numId, status);
+      if (!didPersist) {
+        setAlerts(previousAlerts);
+        console.warn(`Failed to persist alert ${id} status update to ${status}`);
+        return false;
+      }
+      await refreshAlerts();
     }
-  };
+    return true;
+  }, [alerts, refreshAlerts]);
+
+  const resolveAlert = useCallback((id: string) => {
+    return updateAlertStatus(id, 'RESOLVED');
+  }, [updateAlertStatus]);
+
+  const investigateAlert = useCallback((id: string) => {
+    return updateAlertStatus(id, 'INVESTIGATING');
+  }, [updateAlertStatus]);
 
   const addComplaint = (newComp: Omit<Complaint, 'id' | 'submittedAt' | 'status'>) => {
     const id = `#${105 + complaints.length}`;
@@ -360,6 +385,9 @@ export function AquaGuardProvider({ children }: { children: ReactNode }) {
           : t
       )
     );
+    resetLivePredictionApi(tankId).catch((err) => {
+      console.warn(`Failed to reset live AI baseline for ${tankId}:`, err);
+    });
   };
 
   const advanceIncidentStage = (stage: IncidentStage, note: string) => {

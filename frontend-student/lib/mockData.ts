@@ -151,17 +151,19 @@ export const generateHistoricalReadings = (
     const turbVariation = Math.sin(i / 3) * 0.4 + (progress > 0.6 ? (progress - 0.6) * 12 : 0);
     const tdsVariation = Math.cos(i / 4) * 15 + (progress > 0.6 ? (progress - 0.6) * 200 : 0);
     const phDrop = progress > 0.5 ? (progress - 0.5) * 1.2 : 0;
+    const phJitter = Math.sin(i * 1.7) * 0.05;
+    const riskJitter = Math.max(0, Math.cos(i * 1.3) * 4 + 4);
 
     readings.push({
       tank_id: baseReading.tank_id,
       recorded_at: timestamp,
       temperature: Number((24.5 + Math.sin(i / 5) * 1.8).toFixed(2)),
-      ph: Number(Math.max(6.1, 7.3 - phDrop + (Math.random() * 0.1 - 0.05)).toFixed(2)),
+      ph: Number(Math.max(6.1, 7.3 - phDrop + phJitter).toFixed(2)),
       tds: Math.round(280 + tdsVariation),
       turbidity: Number(Math.max(0.8, 1.2 + turbVariation).toFixed(2)),
       water_level: Number((75 + Math.sin(i / 2) * 10).toFixed(1)),
       flow_rate: Number((3.5 + Math.cos(i / 3) * 0.8).toFixed(1)),
-      risk_score: Math.min(100, Math.round(15 + (progress > 0.6 ? (progress - 0.6) * 190 : Math.random() * 8))),
+      risk_score: Math.min(100, Math.round(15 + (progress > 0.6 ? (progress - 0.6) * 190 : riskJitter))),
       ai_risk_probability: Number((progress > 0.6 ? 0.3 + (progress - 0.6) * 1.35 : 0.12).toFixed(2)),
     });
   }
